@@ -6,7 +6,7 @@
 <!--[![slack](https://img.shields.io/badge/slack-join%20the%20conversation-ff69b4.svg)][SlackUrl]-->
 
 <!--[![Build Status][BuildStatusImg]][BuildMasterUrl]-->
-[![Go Report Card][GoReportBadgeUrl]][GoReportMasterUrl]
+[![Go Report Card](https://goreportcard.com/badge/github.com/orkaproj/active-monitor)](https://goreportcard.com/report/github.com/orkaproj/active-monitor)
 ![version](https://img.shields.io/badge/version-0.1.0-blue.svg?cacheSeconds=2592000)
 
 ## Motivation
@@ -200,6 +200,3 @@ The Apache 2 license is used in this project. Details can be found in the [LICEN
 
 [BuildStatusImg]: https://www.travis-ci.org/orkaproj/active-monitor.svg?branch=master
 [BuildMasterUrl]: https://www.travis-ci.org/orkaproj/active-monitor
-
-[GoReportBadgeUrl]: https://goreportcard.com/badge/github.com/orkaproj/active-monitor
-[GoReportMasterUrl]: https://goreportcard.com/report/github.com/orkaproj/active-monitor
