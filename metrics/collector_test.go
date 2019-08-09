@@ -11,7 +11,7 @@ var registry = prometheus.NewRegistry()
 
 func TestCollectEmptyMetric(t *testing.T) {
 	value := ""
-	var parameters = []wfv1.Parameter{wfv1.Parameter{Value: &value}}
+	var parameters = []wfv1.Parameter{{Value: &value}}
 
 	wfstatus := &wfv1.WorkflowStatus{
 		Outputs: &wfv1.Outputs{
@@ -23,7 +23,7 @@ func TestCollectEmptyMetric(t *testing.T) {
 
 func TestCollectMetric(t *testing.T) {
 	value := "{\"metrics\":[{\"name\": \"custom_total\", \"value\": 123, \"metrictype\": \"gauge\", \"help\": \"test help\"}, {\"name\": \"custom_metric\", \"value\": 12.3, \"metrictype\": \"gauge\"}]}"
-	var parameters = []wfv1.Parameter{wfv1.Parameter{Value: &value}}
+	var parameters = []wfv1.Parameter{{Value: &value}}
 
 	wfstatus := &wfv1.WorkflowStatus{
 		Outputs: &wfv1.Outputs{
@@ -35,7 +35,7 @@ func TestCollectMetric(t *testing.T) {
 
 func TestCollectNoNameMetric(t *testing.T) {
 	value := "{\"metrics\":[{\"value\": 123, \"metrictype\": \"gauge\", \"help\": \"test help\"}, {\"name\": \"custom_metric\", \"value\": 12.3, \"metrictype\": \"gauge\"}]}"
-	var parameters = []wfv1.Parameter{wfv1.Parameter{Value: &value}}
+	var parameters = []wfv1.Parameter{{Value: &value}}
 
 	wfstatus := &wfv1.WorkflowStatus{
 		Outputs: &wfv1.Outputs{
@@ -47,7 +47,7 @@ func TestCollectNoNameMetric(t *testing.T) {
 
 func TestCollectNoValueMetric(t *testing.T) {
 	value := "{\"metrics\":[{\"name\": \"custom_total\", \"metrictype\": \"gauge\", \"help\": \"test help\"}, {\"name\": \"custom_metric\", \"value\": 12.3, \"metrictype\": \"gauge\"}]}"
-	var parameters = []wfv1.Parameter{wfv1.Parameter{Value: &value}}
+	var parameters = []wfv1.Parameter{{Value: &value}}
 
 	wfstatus := &wfv1.WorkflowStatus{
 		Outputs: &wfv1.Outputs{
