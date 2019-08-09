@@ -35,10 +35,6 @@ The sort of HealthChecks one could run with Active-Monitor are:
 * Kubernetes Cluster
 * [Argo Workflows Controller](https://github.com/argoproj/argo)
 
-## Generates Resources
-* `activemonitor.orkaproj.io/v1alpha1/HealthCheck`
-* `argoproj.io/v1alpha1/Workflow`
-
 ## Installation Guide
 ```
 # install argo workflow-controller
@@ -90,6 +86,10 @@ Events:
   ----    ------  ----                  ----     -------
   Normal  Synced  16m (x2340 over 28d)  healthcheck  HealthCheck synced successfully
 ```
+
+## Generates Resources
+* `activemonitor.orkaproj.io/v1alpha1/HealthCheck`
+* `argoproj.io/v1alpha1/Workflow`
 
 #### Sample HealthCheck CR:
 ```yaml
