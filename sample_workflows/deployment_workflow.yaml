@@ -1,0 +1,59 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: "synthetic-deployment-"
+  namespace: kube-system
+spec:
+  entrypoint: synthetic-example
+  onExit: exit-handler
+  templates:
+  - name: synthetic-example
+    steps:
+    - - name: create-deployment
+        template: create-deployment
+    - - name: sleep
+        template: sleep-n-sec
+    - - name: check-deployment
+        template: check-deployment
+    - - name: delete-deployment
+        template: delete-deployment
+
+  - name: exit-handler
+    steps:
+    - - name: cleanup
+        template: cleanup-workflow
+        when: "{{workflow.status}} == Failed"
+
+  - name: create-deployment
+    script:
+      image: lachlanevenson/k8s-kubectl
+      command: [sh]
+      source: |
+        kubectl run operator-nginx --image=nginx:latest --replicas=2 --port=80 -n monitoring
+
+  - name: sleep-n-sec
+    container:
+      image: alpine:latest
+      command: [sh, -c]
+      args: ["echo sleeping for 40 seconds; sleep 40; echo done"]
+
+  - name: check-deployment
+    script:
+      image: lachlanevenson/k8s-kubectl
+      command: [sh]
+      source: |
+        kubectl get po -n monitoring | grep operator-nginx | grep Running
+  
+  - name: delete-deployment
+    script:
+      image: lachlanevenson/k8s-kubectl
+      command: [sh]
+      source: |
+          kubectl delete deploy operator-nginx -n monitoring; [[ $? == 0 ]] && echo "Workflow ran successfully"
+
+  - name: cleanup-workflow
+    script:
+      image: lachlanevenson/k8s-kubectl
+      command: [sh]
+      source: |
+        kubectl delete deploy operator-nginx -n monitoring; [[ $? == 0 ]] && echo  "Workflow failed and completed cleanup"

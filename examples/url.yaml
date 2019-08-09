@@ -1,0 +1,17 @@
+apiVersion: activemonitor.orkaproj.io/v1alpha1
+kind: HealthCheck
+metadata:
+  generateName: url-hello-
+  namespace: health
+spec:
+  repeatInterval: 60 # duration in seconds
+  workflow:
+    generateName: url-hello-
+    resource:
+      namespace: health # workflow will be submitted in this ns
+      serviceAccount: activemonitor-controller-sa # workflow will be submitted using this sa
+      source:
+        # provide your workflow via URL
+        url:
+          path: https://raw.githubusercontent.com/argoproj/argo/master/examples/hello-world.yaml
+          verifyCert: false

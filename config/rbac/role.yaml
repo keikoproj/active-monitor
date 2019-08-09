@@ -1,0 +1,41 @@
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: manager-role
+rules:
+- apiGroups:
+  - activemonitor.orkaproj.io
+  resources:
+  - healthchecks
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - activemonitor.orkaproj.io
+  resources:
+  - healthchecks/status
+  verbs:
+  - get
+  - update
+  - patch
+- apiGroups:
+  - argoproj.io
+  resources:
+  - workflow
+  - workflows
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete

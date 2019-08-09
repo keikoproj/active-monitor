@@ -1,0 +1,7 @@
+apiVersion: activemonitor.orkaproj.io/v1alpha1
+kind: HealthCheck
+metadata:
+  name: healthcheck-sample
+spec:
+  # Add fields here
+  foo: bar
