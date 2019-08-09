@@ -1,0 +1,92 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: activemonitor-controller-sa
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: activemonitor-controller-role
+  namespace: health
+rules:
+- apiGroups:
+  - "*"
+  resources:
+  - pods
+  - deployments
+  - replicasets
+  - services
+  - configmaps
+  - secrets
+  - workflows
+  verbs:
+  - "*"
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: activemonitor-controller-clusterrole
+rules:
+- apiGroups:
+  - "*"
+  - activemonitor.orkaproj.io
+  resources:
+  - workflows
+  - monitors
+  - pods
+  - events
+  - healthchecks
+  verbs:
+  - "*"
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: activemonitor-controller-rb
+  namespace: health
+subjects:
+- kind: ServiceAccount
+  name: activemonitor-controller-sa
+  namespace: health
+roleRef:
+  kind: Role
+  name: activemonitor-controller-role
+  apiGroup: rbac.authorization.k8s.io
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1beta1
+metadata:
+  name: activemonitor-controller-cluster-rb
+subjects:
+- kind: ServiceAccount
+  name: activemonitor-controller-sa
+  namespace: health
+roleRef:
+  kind: ClusterRole
+  name: activemonitor-controller-clusterrole
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: activemonitor-controller
+  namespace: health
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: activemonitor-controller
+  template:
+    metadata:
+      labels:
+        name: activemonitor-controller
+    spec:
+      containers:
+        - name: activemonitor-controller
+          image: activemonitor-controller:latest
+          imagePullPolicy: Always
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "80Mi"
+      serviceAccountName: activemonitor-controller-sa

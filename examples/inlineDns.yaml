@@ -1,0 +1,30 @@
+apiVersion: activemonitor.orkaproj.io/v1alpha1
+kind: HealthCheck
+metadata:
+  generateName: dns-healthcheck-
+  namespace: health
+spec:
+  repeatInterval: 60 # duration in seconds
+  description: "Monitor pod dns connections"
+  workflow:
+    generateName: dns-healthcheck-
+    resource:
+      namespace: health # workflow will be submitted in this ns
+      serviceAccount: activemonitor-controller-sa # workflow will be submitted using this
+      source:
+        inline: |
+            apiVersion: argoproj.io/v1alpha1
+            kind: Workflow
+            metadata:
+              generateName: dns-healthcheck-
+            spec:
+              ttlSecondsAfterFinished: 60
+              entrypoint: start
+              templates:
+              - name: start
+                retryStrategy:
+                  limit: 3
+                container: 
+                  image: tutum/dnsutils
+                  command: [sh, -c]
+                  args: ["nslookup www.google.com"]

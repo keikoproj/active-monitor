@@ -1,0 +1,23 @@
+# Binaries for programs and plugins
+/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Temporary or metadata files
+*.yaml-e
+
+# Test binary, build with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# IDE related
+.idea
+.vscode
+
+# OSX metadata files
+.DS_Store

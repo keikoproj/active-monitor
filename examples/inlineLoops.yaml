@@ -1,0 +1,41 @@
+apiVersion: activemonitor.orkaproj.io/v1alpha1
+kind: HealthCheck
+metadata:
+  generateName: example-inline-loops-
+  namespace: health
+spec:
+  repeatInterval: 10 # duration in seconds
+  workflow:
+    generateName: example-inline-loops-
+    resource:
+      namespace: health # workflow will be submitted in this ns
+      serviceAccount: activemonitor-controller-sa # workflow will be submitted using this
+      source:
+        inline: |
+          apiVersion: argoproj.io/v1alpha1
+          kind: Workflow
+          metadata:
+            generateName: loops-
+          spec:
+            entrypoint: loop-example
+            templates:
+            - name: loop-example
+              steps:
+              - - name: print-message
+                  template: whalesay
+                  arguments:
+                    parameters:
+                    - name: message
+                      value: "{{item}}"
+                  withItems:
+                  - hello world
+                  - goodbye world
+
+            - name: whalesay
+              inputs:
+                parameters:
+                - name: message
+              container:
+                image: docker/whalesay:latest
+                command: [cowsay]
+                args: ["{{inputs.parameters.message}}"]
