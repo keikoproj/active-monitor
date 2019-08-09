@@ -46,9 +46,6 @@ kubectl apply -f https://raw.githubusercontent.com/orkaproj/active-monitor/maste
 
 # step 3: run the controller via docker container
 docker run orkaproj/active-monitor:latest
-
-# alternate step: if you have the source code cloned locally, it may be easier to run the controller with the Makefile target
-make run
 ```
 
 ### Alternate Install - using locally cloned code
