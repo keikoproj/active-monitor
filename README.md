@@ -5,8 +5,8 @@
 <!--[![PR](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)][GithubPrsUrl]-->
 <!--[![slack](https://img.shields.io/badge/slack-join%20the%20conversation-ff69b4.svg)][SlackUrl]-->
 
-<!--[![Build Status][BuildStatusImg]][BuildMasterUrl]-->
-[![Go Report Card](https://goreportcard.com/badge/github.com/orkaproj/active-monitor)](https://goreportcard.com/report/github.com/orkaproj/active-monitor)
+[![Build Status][BuildStatusImg]][BuildMasterUrl]
+[![Go Report Card][GoReportBadgeUrl]][GoReportMasterUrl]
 ![version](https://img.shields.io/badge/version-0.1.0-blue.svg?cacheSeconds=2592000)
 
 ## Motivation
@@ -42,14 +42,11 @@ The sort of HealthChecks one could run with Active-Monitor are:
 ## Installation Guide
 ```
 # install argo workflow-controller
-kubectl apply -f deploy/deploy-argo.yaml
+kubectl apply -f https://raw.githubusercontent.com/orkaproj/active-monitor/master/deploy/deploy-argo.yaml
 
 # install active-monitor controller
-#kubectl apply -f https://raw.githubusercontent.com/orkaproj/active-monitor/master/config/crd/bases/activemonitor.orkaproj.io_healthchecks.yaml #uncomment this line after publication and testing of command
-# the following line includes an overly complex URL, but that is only necessary temporarily... until the repo is made public. once made public, the simpler line above will be the only one which should be run.
-kubectl apply -f https://raw.githubusercontent.com/orkaproj/active-monitor/kubebuilder/config/crd/bases/activemonitor.orkaproj.io_healthchecks.yaml?token=AAEKDX5SYA5BNMDCXUUNQDS5KWWQG
-
-kubectl apply -f deploy/deploy-active-monitor.yaml
+kubectl apply -f https://raw.githubusercontent.com/orkaproj/active-monitor/master/config/crd/bases/activemonitor.orkaproj.io_healthchecks.yaml
+kubectl apply -f https://raw.githubusercontent.com/orkaproj/active-monitor/master/deploy/deploy-active-monitor.yaml
 
 # finally, run the controller either with local source
 make run
@@ -198,5 +195,8 @@ The Apache 2 license is used in this project. Details can be found in the [LICEN
 [GithubUrl]: https://github.com/orkaproj/active-monitor/
 [SlackUrl]: https://orkaproj.slack.com/messages/??
 
-[BuildStatusImg]: https://www.travis-ci.org/orkaproj/active-monitor.svg?branch=master
-[BuildMasterUrl]: https://www.travis-ci.org/orkaproj/active-monitor
+[BuildStatusImg]: https://travis-ci.org/orkaproj/active-monitor.svg?branch=master
+[BuildMasterUrl]: https://travis-ci.org/orkaproj/active-monitor
+
+[GoReportBadgeUrl]: https://goreportcard.com/badge/github.com/orkaproj/active-monitor
+[GoReportMasterUrl]: https://goreportcard.com/report/github.com/orkaproj/active-monitor
