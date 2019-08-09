@@ -37,54 +37,57 @@ The sort of HealthChecks one could run with Active-Monitor are:
 
 ## Installation Guide
 ```
-# install argo workflow-controller
+# step 1: install argo workflow-controller
 kubectl apply -f https://raw.githubusercontent.com/orkaproj/active-monitor/master/deploy/deploy-argo.yaml
 
-# install active-monitor controller
+# step 2: install active-monitor controller
 kubectl apply -f https://raw.githubusercontent.com/orkaproj/active-monitor/master/config/crd/bases/activemonitor.orkaproj.io_healthchecks.yaml
 kubectl apply -f https://raw.githubusercontent.com/orkaproj/active-monitor/master/deploy/deploy-active-monitor.yaml
 
-# finally, run the controller either with local source
-make run
-# or via docker container
+# step 3: run the controller via docker container
 docker run orkaproj/active-monitor:latest
+
+# alternate step: if you have the source code cloned locally, it may be easier to run the controller with the Makefile target
+make run
+```
+
+### Alternate Install - using locally cloned code
+```
+# step 1: install argo workflow-controller
+kubectl apply -f deploy/deploy-argo.yaml
+
+# step 2: install active-monitor controller
+make install
+kubectl apply -f deploy/deploy-active-monitor.yaml
+
+# step 3: run the controller via Makefile target
+make run
 ```
 
 ## Usage and Examples
-#### Run example active-monitor resources
+#### Run example healthchecks
 ```
-kubectl apply -f examples/*.yaml
+kubectl create -f examples/inlineHello.yaml
 ```
 
 List all health checks:
-`kubectl get healthchecks -n health`
+`kubectl get healthcheck -n health` OR `kubectl get hc -n health`
 ```
-kubectl get healthchecks -n health
-NAME                           AGE
-healthcheck-aws-instance-limits    28d
-healthcheck-dns                    28d
-healthcheck-dns-hostnetwork        28d
-healthcheck-kiam-agent             28d
-healthcheck-kiam-agent-all-nodes   28d
-healthcheck-namespace              28d
+NAME                 AGE
+inline-hello-zz5vm   55s
 ```
 
 View additional details/status of a health check:
-`kubectl describe healthcheck-kiam-agent-all-nodes`
+`kubectl describe healthcheck inline-hello-zz5vm -n health`
 ```
 ...
 Status:
-  Failed Count:              165
-  Finished At:               2019-06-25T20:46:46Z
-  Last Failed At:            2019-06-25T20:13:39Z
-  Last Failed Workflow:      healthcheck-kiam-agent-all-nodes-test-l78f2
-  Last Successful Workflow:  healthcheck-kiam-agent-all-nodes-test-82qtn
+  Failed Count:              0
+  Finished At:               2019-08-09T22:50:57Z
+  Last Successful Workflow:  inline-hello-4mwxf
   Status:                    Succeeded
-  Success Count:             2175
-Events:
-  Type    Reason  Age                   From     Message
-  ----    ------  ----                  ----     -------
-  Normal  Synced  16m (x2340 over 28d)  healthcheck  HealthCheck synced successfully
+  Success Count:             13
+Events:                      <none>
 ```
 
 ## Generates Resources
