@@ -1,13 +1,12 @@
 # Active-Monitor
 
 [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)][GithubMaintainedUrl]
-[![contrib](https://img.shields.io/badge/contributions-welcome-orange.svg)][GithubUrl]
-<!--[![PR](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)][GithubPrsUrl]-->
-<!--[![slack](https://img.shields.io/badge/slack-join%20the%20conversation-ff69b4.svg)][SlackUrl]-->
+[![PR](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)][GithubPrsUrl]
+[![slack](https://img.shields.io/badge/slack-join%20the%20conversation-ff69b4.svg)][SlackUrl]
 
+![version](https://img.shields.io/badge/version-0.1.0-blue.svg?cacheSeconds=2592000)
 [![Build Status][BuildStatusImg]][BuildMasterUrl]
 [![Go Report Card][GoReportBadgeUrl]][GoReportMasterUrl]
-![version](https://img.shields.io/badge/version-0.1.0-blue.svg?cacheSeconds=2592000)
 
 ## Motivation
 Active-Monitor is a Kubernetes custom resource controller which enables deep cluster monitoring using [Argo workflows](https://github.com/argoproj/argo).
@@ -165,34 +164,27 @@ Here is an example: [custom-metrics.yaml](./examples/custom-metrics.yaml) which 
 
 Please see [CONTRIBUTING.md](.github/CONTRIBUTING.md).
 
-## Developer Guide
-
-Please see [DEVELOPER.md](.github/DEVELOPER.md).
-
 ## License
 The Apache 2 license is used in this project. Details can be found in the [LICENSE](./LICENSE) file.
 
-## Orka Projects
+## Other Orka Projects
 [Instance Manager][InstanceManagerUrl] -
-[Forensics Controller][ForensicsControllerUrl] -
+[Kube Forensics][KubeForensicsUrl] -
 [Addon Manager][AddonManagerUrl] -
-[Rollup Controller][RollupControllerUrl] -
-[Active Monitor][ActiveMonitorControllerUrl] -
+[Upgrade Manager][UpgradeManagerUrl] -
 [Minion Manager][MinionManagerUrl] -
 [Governor][GovernorUrl]
 
 <!-- URLs -->
 [InstanceManagerUrl]: https://github.com/orkaproj/instance-manager
-[ForensicsControllerUrl]: https://github.com/orkaproj/kube-forensics
+[KubeForensicsUrl]: https://github.com/orkaproj/kube-forensics
 [AddonManagerUrl]: https://github.com/orkaproj/addon-manager
-[RollupControllerUrl]: https://github.com/orkaproj/rollup
-[ActiveMonitorControllerUrl]: https://github.com/orkaproj/active-monitor
-[MinionManagerUrl]: https://github.com/orkaproj/minion-mgr
+[UpgradeManagerUrl]: https://github.com/orkaproj/upgrade-manager
+[MinionManagerUrl]: https://github.com/orkaproj/minion-manager
 [GovernorUrl]: https://github.com/orkaproj/governor
 
 [GithubMaintainedUrl]: https://github.com/orkaproj/active-monitor/graphs/commit-activity
 [GithubPrsUrl]: https://github.com/orkaproj/active-monitor/pulls
-[GithubUrl]: https://github.com/orkaproj/active-monitor/
 [SlackUrl]: https://orkaproj.slack.com/messages/??
 
 [BuildStatusImg]: https://travis-ci.org/orkaproj/active-monitor.svg?branch=master
