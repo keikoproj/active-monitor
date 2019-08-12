@@ -4,7 +4,7 @@ metadata:
   generateName: example-inline-loops-
   namespace: health
 spec:
-  repeatInterval: 10 # duration in seconds
+  repeatAfterSec: 60 # duration in seconds
   workflow:
     generateName: example-inline-loops-
     resource:
