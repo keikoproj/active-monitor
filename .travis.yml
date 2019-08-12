@@ -18,7 +18,9 @@ jobs:
 
     - stage: unit-test
       script:
-      - which kubebuilder
+      - which kubebuilder && which kubectl && which ls
+      - ls /usr/local/kubebuilder
+      - ls $HOME/ && ls $HOME/opt && ls $HOME/opt/kubebuilder
       - go test -v ./api/... ./controllers/... ./metrics/... ./store/... -coverprofile coverage.txt
       - bash <(curl -s https://codecov.io/bash)
 
