@@ -16,7 +16,7 @@ While it is not too difficult to know that all entities in a cluster are running
 ## Overview
 Active-Monitor will create a new `health` namespace when installed in the cluster. Users can then create and submit HealthCheck objects to the Kubernetes server. A HealthCheck is essentially an instrumented wrapper around an Argo workflow.
 
-The workflow is run periodically, as definied by its individual spec, and watched by the Active-Monitor controller.
+The workflow is run periodically, as definied by `repeatAfterSec` property in its spec, and watched by the Active-Monitor controller.
 
 Active-Monitor sets the status of the HealthCheck CR to indicate whether the monitoring check succeeded or failed. External systems can query these CRs and take appropriate action if they failed.
 
@@ -97,7 +97,7 @@ metadata:
   generateName: dns-healthcheck-
   namespace: health
 spec:
-  repeatInterval: 60
+  repeatAfterSec: 60
   description: "Monitor pod dns connections"
   workflow:
     generateName: dns-workflow-

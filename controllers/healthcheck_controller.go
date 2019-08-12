@@ -100,20 +100,20 @@ func (r *HealthCheckReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 	if hcSpec.Workflow.Resource != nil {
 		wfNamePrefix := hcSpec.Workflow.GenerateName
 		wfNamespace := hcSpec.Workflow.Resource.Namespace
-		repeatInterval := hcSpec.RepeatInterval
+		repeatAfterSec := hcSpec.RepeatAfterSec
 		now := metav1.Time{Time: time.Now()}
 		var finishedAtTime int64
 		if healthCheck.Status.FinishedAt != nil {
 			finishedAtTime = healthCheck.Status.FinishedAt.Time.Unix()
 		}
-		// workflows can be paused by setting repeatInterval to <= 0.
-		if repeatInterval <= 0 {
-			log.Info("Workflow will be skipped due to repeatInterval value", "repeatInterval", repeatInterval)
+		// workflows can be paused by setting repeatAfterSec to <= 0.
+		if repeatAfterSec <= 0 {
+			log.Info("Workflow will be skipped due to repeatAfterSec value", "repeatAfterSec", repeatAfterSec)
 			healthCheck.Status.Status = "Stopped"
-			healthCheck.Status.ErrorMessage = fmt.Sprintf("workflow execution is stopped due to spec.repeatInterval set to %d", repeatInterval)
+			healthCheck.Status.ErrorMessage = fmt.Sprintf("workflow execution is stopped due to spec.repeatAfterSec set to %d", repeatAfterSec)
 			healthCheck.Status.FinishedAt = &now
 			return ctrl.Result{}, nil
-		} else if int(time.Now().Unix()-finishedAtTime) < repeatInterval {
+		} else if int(time.Now().Unix()-finishedAtTime) < repeatAfterSec {
 			log.Info("Workflow already executed", "finishedAtTime", finishedAtTime)
 			return ctrl.Result{}, nil
 		}
@@ -184,7 +184,7 @@ func (r *HealthCheckReconciler) createSubmitWorkflow(ctx context.Context, log lo
 func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, log logr.Logger, wfNamespace, wfName string, hc *activemonitorv1alpha1.HealthCheck) error {
 	var now metav1.Time
 	then := metav1.Time{Time: time.Now()}
-	repeatInterval := hc.Spec.RepeatInterval
+	repeatAfterSec := hc.Spec.RepeatAfterSec
 	for {
 		now = metav1.Time{Time: time.Now()}
 		// grab workflow object by name and check its status; update healthcheck accordingly
@@ -230,7 +230,7 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, log
 		}
 		// reschedule next run of workflow
 		helper := r.createSubmitWorkflowHelper(ctx, log, wfNamespace, hc)
-		r.RepeatTimer = time.AfterFunc(time.Duration(repeatInterval)*time.Second, helper)
+		r.RepeatTimer = time.AfterFunc(time.Duration(repeatAfterSec)*time.Second, helper)
 		log.Info("Rescheduled workflow for next run", "namespace", wfNamespace, "name", wfName)
 	}
 	return nil
@@ -262,7 +262,7 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 	}
 	// and since we will reschedule workflows ourselves, we don't need k8s to try to do so for us beyond
 	var timeout int64
-	timeout = int64(hc.Spec.RepeatInterval)
+	timeout = int64(hc.Spec.RepeatAfterSec)
 	if activeDeadlineSeconds := data["spec"].(map[string]interface{})["activeDeadlineSeconds"]; activeDeadlineSeconds == nil {
 		data["spec"].(map[string]interface{})["activeDeadlineSeconds"] = &timeout
 	}

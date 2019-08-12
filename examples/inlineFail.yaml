@@ -4,7 +4,7 @@ metadata:
   generateName: fail-healthcheck-
   namespace: health
 spec:
-  repeatInterval: 60 # duration in seconds
+  repeatAfterSec: 60 # duration in seconds
   workflow:
     generateName: fail-workflow-
     resource:

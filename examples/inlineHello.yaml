@@ -4,7 +4,7 @@ metadata:
   generateName: inline-hello-
   namespace: health
 spec:
-  repeatInterval: 60 # duration in seconds
+  repeatAfterSec: 60 # duration in seconds
   workflow:
     generateName: inline-hello-
     resource:
