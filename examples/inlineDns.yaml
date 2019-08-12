@@ -4,10 +4,10 @@ metadata:
   generateName: dns-healthcheck-
   namespace: health
 spec:
-  repeatInterval: 60 # duration in seconds
+  repeatAfterSec: 60 # duration in seconds
   description: "Monitor pod dns connections"
   workflow:
-    generateName: dns-healthcheck-
+    generateName: dns-workflow-
     resource:
       namespace: health # workflow will be submitted in this ns
       serviceAccount: activemonitor-controller-sa # workflow will be submitted using this
@@ -16,7 +16,7 @@ spec:
             apiVersion: argoproj.io/v1alpha1
             kind: Workflow
             metadata:
-              generateName: dns-healthcheck-
+              generateName: dns-workflow-
             spec:
               ttlSecondsAfterFinished: 60
               entrypoint: start

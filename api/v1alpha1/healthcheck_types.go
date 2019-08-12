@@ -26,7 +26,7 @@ import (
 
 // HealthCheckSpec defines the desired state of HealthCheck
 type HealthCheckSpec struct {
-	RepeatInterval int      `json:"repeatInterval"`
+	RepeatAfterSec int      `json:"repeatAfterSec"`
 	Description    string   `json:"description,omitempty"`
 	Workflow       Workflow `json:"workflow"`
 	Scope          string   `json:"scope,omitempty"` // defines if a workflow runs Namespace or Cluster scoped

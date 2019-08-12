@@ -389,7 +389,7 @@ spec:
           properties:
             description:
               type: string
-            repeatInterval:
+            repeatAfterSec:
               type: integer
             scope:
               type: string
@@ -430,7 +430,7 @@ spec:
                   type: object
               type: object
           required:
-          - repeatInterval
+          - repeatAfterSec
           - workflow
           type: object
         status:
