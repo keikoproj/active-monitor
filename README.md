@@ -62,18 +62,17 @@ make run
 
 ## Usage and Examples
 #### Run example healthchecks
-```
-kubectl create -f examples/inlineHello.yaml
-```
+Create a new healthcheck:
+`kubectl create -f examples/inlineHello.yaml`
 
-List all health checks:
+List all healthchecks:
 `kubectl get healthcheck -n health` OR `kubectl get hc -n health`
 ```
 NAME                 AGE
 inline-hello-zz5vm   55s
 ```
 
-View additional details/status of a health check:
+View additional details/status of a healthcheck:
 `kubectl describe healthcheck inline-hello-zz5vm -n health`
 ```
 ...
@@ -158,7 +157,7 @@ The global output parameters should look like below:
 }"
 ```
 
-Here is an example: [custom-metrics.yaml](./examples/custom-metrics.yaml) which shows how to produce custom metrics.
+<!--Here is an example: [custom-metrics.yaml](./examples/custom-metrics.yaml) which shows how to produce custom metrics.-->
 
 ## ❤ Contributing ❤
 
