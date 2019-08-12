@@ -26,7 +26,7 @@ jobs:
     - stage: publish-image
       if: type = push
       script:
-      - echo "$DOCKER_PASSWORD" | docker login --username "$DOCKER_USERNAME" --password-stdin
+      - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
       - export IMG=orkaproj/active-monitor:latest #$TRAVIS_BRANCH
       - make docker-build
       - make docker-push
