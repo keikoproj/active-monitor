@@ -9,6 +9,7 @@ git:
 env:
   global:
     - GO111MODULE=on
+    - KUBEBUILDER_CONTROLPLANE_START_TIMEOUT=600s
 
 install: skip
 
@@ -17,6 +18,7 @@ jobs:
 
     - stage: unit-test
       script:
+      - which kubebuilder
       - go test -v ./api/... ./controllers/... ./metrics/... ./store/... -coverprofile coverage.txt
       - bash <(curl -s https://codecov.io/bash)
 
