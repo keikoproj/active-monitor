@@ -11,7 +11,7 @@ env:
     - GO111MODULE=on
 
 install:
-  # install all of the dependencies you need here
+  # install dependencies needed by jobs
   - wget https://github.com/kubernetes-sigs/kubebuilder/releases/download/v2.0.0-beta.0/kubebuilder_2.0.0-beta.0_linux_amd64.tar.gz
   - tar -zxvf  kubebuilder_2.0.0-beta.0_linux_amd64.tar.gz
   - sudo mv kubebuilder_2.0.0-beta.0_linux_amd64 /usr/local/kubebuilder
@@ -26,7 +26,7 @@ jobs:
     - stage: publish-image
       if: type = push
       script:
-      - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-      - export IMG=orkaproj/active-monitor:$TRAVIS_BRANCH
+      - echo "$DOCKER_PASSWORD" | docker login --username "$DOCKER_USERNAME" --password-stdin
+      - export IMG=orkaproj/active-monitor:latest #$TRAVIS_BRANCH
       - make docker-build
       - make docker-push
