@@ -7,7 +7,7 @@
 ![version](https://img.shields.io/badge/version-0.1.0-blue.svg?cacheSeconds=2592000)
 [![Build Status][BuildStatusImg]][BuildMasterUrl]
 [![codecov][CodecovImg]][CodecovUrl]
-[![Go Report Card][GoReportBadgeUrl]][GoReportMasterUrl]
+[![Go Report Card][GoReportImg]][GoReportUrl]
 
 ## Motivation
 Active-Monitor is a Kubernetes custom resource controller which enables deep cluster monitoring using [Argo workflows](https://github.com/argoproj/argo).
@@ -157,7 +157,7 @@ The global output parameters should look like below:
   ]
 }"
 ```
-
+<!--Re-add following line once there is a good custom-metrics example -->
 <!--Here is an example: [custom-metrics.yaml](./examples/custom-metrics.yaml) which shows how to produce custom metrics.-->
 
 ## ❤ Contributing ❤
@@ -185,7 +185,7 @@ The Apache 2 license is used in this project. Details can be found in the [LICEN
 
 [GithubMaintainedUrl]: https://github.com/orkaproj/active-monitor/graphs/commit-activity
 [GithubPrsUrl]: https://github.com/orkaproj/active-monitor/pulls
-[SlackUrl]: https://orkaproj.slack.com/messages/??
+[SlackUrl]: https://orkaproj.slack.com/messages/active-monitor
 
 [BuildStatusImg]: https://travis-ci.org/orkaproj/active-monitor.svg?branch=master
 [BuildMasterUrl]: https://travis-ci.org/orkaproj/active-monitor
@@ -193,5 +193,5 @@ The Apache 2 license is used in this project. Details can be found in the [LICEN
 [CodecovImg]: https://codecov.io/gh/orkaproj/active-monitor/branch/master/graph/badge.svg
 [CodecovUrl]: https://codecov.io/gh/orkaproj/active-monitor
 
-[GoReportBadgeUrl]: https://goreportcard.com/badge/github.com/orkaproj/active-monitor
-[GoReportMasterUrl]: https://goreportcard.com/report/github.com/orkaproj/active-monitor
+[GoReportImg]: https://goreportcard.com/badge/github.com/orkaproj/active-monitor
+[GoReportUrl]: https://goreportcard.com/report/github.com/orkaproj/active-monitor
