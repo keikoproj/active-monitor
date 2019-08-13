@@ -210,7 +210,7 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, log
 				hc.Status.Status = failStr
 				hc.Status.FinishedAt = &now
 				hc.Status.LastFailedAt = &now
-				hc.Status.ErrorMessage = "Failed to start workflow"
+				hc.Status.ErrorMessage = status["message"].(string)
 				hc.Status.FailedCount++
 				hc.Status.LastFailedWorkflow = wfName
 				metrics.MonitorError.With(prometheus.Labels{"healthcheck_name": hc.GetName()}).Inc()
@@ -260,7 +260,7 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 	if ttlSecondAfterFinished := data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"]; ttlSecondAfterFinished == nil {
 		data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"] = defaultWorkflowTTLSec
 	}
-	// and since we will reschedule workflows ourselves, we don't need k8s to try to do so for us beyond
+	// and since we will reschedule workflows ourselves, we don't need k8s to try to do so for us
 	var timeout int64
 	timeout = int64(hc.Spec.RepeatAfterSec)
 	if activeDeadlineSeconds := data["spec"].(map[string]interface{})["activeDeadlineSeconds"]; activeDeadlineSeconds == nil {
