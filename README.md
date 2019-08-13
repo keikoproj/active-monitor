@@ -6,6 +6,7 @@
 
 ![version](https://img.shields.io/badge/version-0.1.0-blue.svg?cacheSeconds=2592000)
 [![Build Status][BuildStatusImg]][BuildMasterUrl]
+[![codecov][CodecovImg]][CodecovUrl]
 [![Go Report Card][GoReportBadgeUrl]][GoReportMasterUrl]
 
 ## Motivation
@@ -31,7 +32,7 @@ The sort of HealthChecks one could run with Active-Monitor are:
 
 ## Dependencies
 * Kubernetes command line tool (kubectl)
-* Kubernetes Cluster
+* Access to Kubernetes Cluster as specified in `~/.kube/config`
 * [Argo Workflows Controller](https://github.com/argoproj/argo)
 
 ## Installation Guide
@@ -188,6 +189,9 @@ The Apache 2 license is used in this project. Details can be found in the [LICEN
 
 [BuildStatusImg]: https://travis-ci.org/orkaproj/active-monitor.svg?branch=master
 [BuildMasterUrl]: https://travis-ci.org/orkaproj/active-monitor
+
+[CodecovImg]: https://codecov.io/gh/orkaproj/active-monitor/branch/master/graph/badge.svg
+[CodecovUrl]: https://codecov.io/gh/orkaproj/active-monitor
 
 [GoReportBadgeUrl]: https://goreportcard.com/badge/github.com/orkaproj/active-monitor
 [GoReportMasterUrl]: https://goreportcard.com/report/github.com/orkaproj/active-monitor
