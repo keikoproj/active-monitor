@@ -43,8 +43,8 @@ kubectl apply -f https://raw.githubusercontent.com/orkaproj/active-monitor/maste
 kubectl apply -f https://raw.githubusercontent.com/orkaproj/active-monitor/master/config/crd/bases/activemonitor.orkaproj.io_healthchecks.yaml
 kubectl apply -f https://raw.githubusercontent.com/orkaproj/active-monitor/master/deploy/deploy-active-monitor.yaml
 
-# step 3: run the controller via docker container
-docker run orkaproj/active-monitor:latest
+# step 3: run the controller via docker container (binding a volume and setting envVar for kubeconfig file)
+docker run -v ~/.kube/config:/root/.kube/config -e "KUBECONFIG=/root/.kube/config" orkaproj/active-monitor:latest
 ```
 
 ### Alternate Install - using locally cloned code
