@@ -198,7 +198,7 @@ The Apache 2 license is used in this project. Details can be found in the [LICEN
 
 [GithubMaintainedUrl]: https://github.com/orkaproj/active-monitor/graphs/commit-activity
 [GithubPrsUrl]: https://github.com/orkaproj/active-monitor/pulls
-[SlackUrl]: https://orkaproj.slack.com/messages/active-monitor
+[SlackUrl]: https://orkaproj.slack.com/app_redirect?channel=active-monitor
 
 [BuildStatusImg]: https://travis-ci.org/orkaproj/active-monitor.svg?branch=master
 [BuildMasterUrl]: https://travis-ci.org/orkaproj/active-monitor
