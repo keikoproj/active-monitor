@@ -40,4 +40,4 @@ Paste any relevant application logs here.
 Open Source software thrives with your contribution. It not only gives skills you might not be able to get in your day job, it also looks amazing on your resume. 
 
 If you want to get involved, check out the 
-[contributing guide](../CONTRIBUTING.md), then reach out to us on [Slack](https://argoproj.github.io/community/join-slack) so we can see how to get you started.
+[contributing guide](../CONTRIBUTING.md), then reach out to us on [Slack](https://orkaproj.slack.com/app_redirect?channel=active-monitor) so we can see how to get you started.
