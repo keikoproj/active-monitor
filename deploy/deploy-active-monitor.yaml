@@ -2,6 +2,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: activemonitor-controller-sa
+  namespace: health
 ---
 kind: Role
 apiVersion: rbac.authorization.k8s.io/v1beta1
