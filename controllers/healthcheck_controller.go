@@ -81,7 +81,7 @@ func ignoreNotFound(err error) error {
 // +kubebuilder:rbac:groups=activemonitor.orkaproj.io,resources=healthchecks/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=argoproj.io,resources=workflow;workflows,verbs=get;list;watch;create;update;patch;delete
 
-// Reconcile per kubebuilder v2.0.0.alpha4
+// Reconcile per kubebuilder v2 pattern
 func (r *HealthCheckReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 	log := r.Log.WithValues(hcKind, req.NamespacedName)
