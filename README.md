@@ -68,21 +68,26 @@ make run
 ## Usage and Examples
 #### Run example healthchecks
 Create a new healthcheck:
+
 `kubectl create -f https://raw.githubusercontent.com/orkaproj/active-monitor/master/examples/inlineHello.yaml`
 
-OR with local source code
+OR with local source code:
 
 `kubectl create -f examples/inlineHello.yaml`
 
-List all healthchecks:
+Then, list all healthchecks:
+
 `kubectl get healthcheck -n health` OR `kubectl get hc -n health`
+
 ```
 NAME                 AGE
 inline-hello-zz5vm   55s
 ```
 
 View additional details/status of a healthcheck:
+
 `kubectl describe healthcheck inline-hello-zz5vm -n health`
+
 ```
 ...
 Status:
