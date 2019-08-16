@@ -65,9 +65,9 @@ var (
 // HealthCheckReconciler reconciles a HealthCheck object
 type HealthCheckReconciler struct {
 	client.Client
-	DynClient   dynamic.Interface
-	Log         logr.Logger
-	RepeatTimer *time.Timer
+	DynClient          dynamic.Interface
+	Log                logr.Logger
+	RepeatTimersByName map[string]*time.Timer
 }
 
 func ignoreNotFound(err error) error {
@@ -86,13 +86,20 @@ func (r *HealthCheckReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 	ctx := context.Background()
 	log := r.Log.WithValues(hcKind, req.NamespacedName)
 
+	// initialize timers map if not already done
+	if r.RepeatTimersByName == nil {
+		r.RepeatTimersByName = make(map[string]*time.Timer)
+	}
+
 	var healthCheck activemonitorv1alpha1.HealthCheck
 	if err := r.Get(ctx, req.NamespacedName, &healthCheck); err != nil {
+		// if our healthcheck was deleted, this Reconcile method is invoked with an empty resource cache
 		// see: https://book.kubebuilder.io/cronjob-tutorial/controller-implementation.html#1-load-the-cronjob-by-name
 		log.Info("Healthcheck object not found for reconciliation, likely deleted")
 		// stop timer corresponding to next schedule run of workflow since parent healthcheck no longer exists
-		if r.RepeatTimer != nil {
-			r.RepeatTimer.Stop()
+		if r.RepeatTimersByName[req.NamespacedName.Name] != nil {
+			log.Info("Cancelling rescheduled workflow for this healthcheck due to deletion")
+			r.RepeatTimersByName[req.NamespacedName.Name].Stop()
 		}
 		return ctrl.Result{}, ignoreNotFound(err)
 	}
@@ -222,15 +229,16 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, log
 	}
 	// since the workflow has taken an unknown duration of time to complete, it's possible that its parent
 	// healthcheck may no longer exist; ensure that it still does before attempting to update it and reschedule
-	if hc.ObjectMeta.DeletionTimestamp == nil {
-		// we now know that the underlying workflow has completed, update the healthcheck accordingly
+	// see: https://book.kubebuilder.io/reference/using-finalizers.html
+	if hc.ObjectMeta.DeletionTimestamp.IsZero() {
+		// since the underlying workflow has completed, we update the healthcheck accordingly
 		err := r.Update(ctx, hc)
 		if err != nil {
 			log.Error(err, "Error updating healthcheck resource")
 		}
 		// reschedule next run of workflow
 		helper := r.createSubmitWorkflowHelper(ctx, log, wfNamespace, hc)
-		r.RepeatTimer = time.AfterFunc(time.Duration(repeatAfterSec)*time.Second, helper)
+		r.RepeatTimersByName[hc.GetName()] = time.AfterFunc(time.Duration(repeatAfterSec)*time.Second, helper)
 		log.Info("Rescheduled workflow for next run", "namespace", wfNamespace, "name", wfName)
 	}
 	return nil
