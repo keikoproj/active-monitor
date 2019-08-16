@@ -37,7 +37,9 @@ The sort of HealthChecks one could run with Active-Monitor are:
 
 ## Installation Guide
 ```
-# step 1: install argo workflow-controller
+# step 0: ensure that all dependencies listed above are installed or present
+
+# step 1: install argo workflow controller
 kubectl apply -f https://raw.githubusercontent.com/orkaproj/active-monitor/master/deploy/deploy-argo.yaml
 
 # step 2: install active-monitor controller
@@ -50,6 +52,8 @@ docker run -v ~/.kube/config:/root/.kube/config -e "KUBECONFIG=/root/.kube/confi
 
 ### Alternate Install - using locally cloned code
 ```
+# step 0: ensure that all dependencies listed above are installed or present
+
 # step 1: install argo workflow-controller
 kubectl apply -f deploy/deploy-argo.yaml
 
@@ -64,6 +68,10 @@ make run
 ## Usage and Examples
 #### Run example healthchecks
 Create a new healthcheck:
+`kubectl create -f https://raw.githubusercontent.com/orkaproj/active-monitor/master/examples/inlineHello.yaml`
+
+OR with local source code
+
 `kubectl create -f examples/inlineHello.yaml`
 
 List all healthchecks:
