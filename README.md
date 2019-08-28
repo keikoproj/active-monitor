@@ -40,14 +40,14 @@ The sort of HealthChecks one could run with Active-Monitor are:
 # step 0: ensure that all dependencies listed above are installed or present
 
 # step 1: install argo workflow controller
-kubectl apply -f https://raw.githubusercontent.com/orkaproj/active-monitor/master/deploy/deploy-argo.yaml
+kubectl apply -f https://raw.githubusercontent.com/keikoproj/active-monitor/master/deploy/deploy-argo.yaml
 
 # step 2: install active-monitor controller
-kubectl apply -f https://raw.githubusercontent.com/orkaproj/active-monitor/master/config/crd/bases/activemonitor.orkaproj.io_healthchecks.yaml
-kubectl apply -f https://raw.githubusercontent.com/orkaproj/active-monitor/master/deploy/deploy-active-monitor.yaml
+kubectl apply -f https://raw.githubusercontent.com/keikoproj/active-monitor/master/config/crd/bases/activemonitor.keikoproj.io_healthchecks.yaml
+kubectl apply -f https://raw.githubusercontent.com/keikoproj/active-monitor/master/deploy/deploy-active-monitor.yaml
 
 # step 3: run the controller via docker container (binding a volume and setting envVar for kubeconfig file)
-docker run -v ~/.kube/config:/root/.kube/config -e "KUBECONFIG=/root/.kube/config" orkaproj/active-monitor:latest
+docker run -v ~/.kube/config:/root/.kube/config -e "KUBECONFIG=/root/.kube/config" keikoproj/active-monitor:latest
 ```
 
 ### Alternate Install - using locally cloned code
@@ -66,10 +66,9 @@ make run
 ```
 
 ## Usage and Examples
-#### Run example healthchecks
 Create a new healthcheck:
 
-`kubectl create -f https://raw.githubusercontent.com/orkaproj/active-monitor/master/examples/inlineHello.yaml`
+`kubectl create -f https://raw.githubusercontent.com/keikoproj/active-monitor/master/examples/inlineHello.yaml`
 
 OR with local source code:
 
@@ -100,12 +99,12 @@ Events:                      <none>
 ```
 
 ## Generates Resources
-* `activemonitor.orkaproj.io/v1alpha1/HealthCheck`
+* `activemonitor.keikoproj.io/v1alpha1/HealthCheck`
 * `argoproj.io/v1alpha1/Workflow`
 
 #### Sample HealthCheck CR:
 ```yaml
-apiVersion: activemonitor.orkaproj.io/v1alpha1
+apiVersion: activemonitor.keikoproj.io/v1alpha1
 kind: HealthCheck
 metadata:
   generateName: dns-healthcheck-
@@ -180,7 +179,7 @@ Please see [CONTRIBUTING.md](.github/CONTRIBUTING.md).
 ## License
 The Apache 2 license is used in this project. Details can be found in the [LICENSE](./LICENSE) file.
 
-## Other Orka Projects
+## Other Keiko Projects
 [Instance Manager][InstanceManagerUrl] -
 [Kube Forensics][KubeForensicsUrl] -
 [Addon Manager][AddonManagerUrl] -
@@ -189,22 +188,22 @@ The Apache 2 license is used in this project. Details can be found in the [LICEN
 [Governor][GovernorUrl]
 
 <!-- URLs -->
-[InstanceManagerUrl]: https://github.com/orkaproj/instance-manager
-[KubeForensicsUrl]: https://github.com/orkaproj/kube-forensics
-[AddonManagerUrl]: https://github.com/orkaproj/addon-manager
-[UpgradeManagerUrl]: https://github.com/orkaproj/upgrade-manager
-[MinionManagerUrl]: https://github.com/orkaproj/minion-manager
-[GovernorUrl]: https://github.com/orkaproj/governor
+[InstanceManagerUrl]: https://github.com/keikoproj/instance-manager
+[KubeForensicsUrl]: https://github.com/keikoproj/kube-forensics
+[AddonManagerUrl]: https://github.com/keikoproj/addon-manager
+[UpgradeManagerUrl]: https://github.com/keikoproj/upgrade-manager
+[MinionManagerUrl]: https://github.com/keikoproj/minion-manager
+[GovernorUrl]: https://github.com/keikoproj/governor
 
-[GithubMaintainedUrl]: https://github.com/orkaproj/active-monitor/graphs/commit-activity
-[GithubPrsUrl]: https://github.com/orkaproj/active-monitor/pulls
-[SlackUrl]: https://orkaproj.slack.com/app_redirect?channel=active-monitor
+[GithubMaintainedUrl]: https://github.com/keikoproj/active-monitor/graphs/commit-activity
+[GithubPrsUrl]: https://github.com/keikoproj/active-monitor/pulls
+[SlackUrl]: https://keikoproj.slack.com/app_redirect?channel=active-monitor
 
-[BuildStatusImg]: https://travis-ci.org/orkaproj/active-monitor.svg?branch=master
-[BuildMasterUrl]: https://travis-ci.org/orkaproj/active-monitor
+[BuildStatusImg]: https://travis-ci.org/keikoproj/active-monitor.svg?branch=master
+[BuildMasterUrl]: https://travis-ci.org/keikoproj/active-monitor
 
-[CodecovImg]: https://codecov.io/gh/orkaproj/active-monitor/branch/master/graph/badge.svg
-[CodecovUrl]: https://codecov.io/gh/orkaproj/active-monitor
+[CodecovImg]: https://codecov.io/gh/keikoproj/active-monitor/branch/master/graph/badge.svg
+[CodecovUrl]: https://codecov.io/gh/keikoproj/active-monitor
 
-[GoReportImg]: https://goreportcard.com/badge/github.com/orkaproj/active-monitor
-[GoReportUrl]: https://goreportcard.com/report/github.com/orkaproj/active-monitor
+[GoReportImg]: https://goreportcard.com/badge/github.com/keikoproj/active-monitor
+[GoReportUrl]: https://goreportcard.com/report/github.com/keikoproj/active-monitor

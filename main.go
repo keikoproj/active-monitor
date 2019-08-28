@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"os"
 
-	activemonitorv1alpha1 "github.com/orkaproj/active-monitor/api/v1alpha1"
-	"github.com/orkaproj/active-monitor/controllers"
-	"github.com/orkaproj/active-monitor/metrics"
+	activemonitorv1alpha1 "github.com/keikoproj/active-monitor/api/v1alpha1"
+	"github.com/keikoproj/active-monitor/controllers"
+	"github.com/keikoproj/active-monitor/metrics"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
