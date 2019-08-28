@@ -4,4 +4,4 @@
 # the repo. Unless a later match takes precedence,
 # The following owners will be requested for
 # review when someone opens a pull request.
-*       @orkaproj/authorized-approvers
+*       @keikoproj/authorized-approvers

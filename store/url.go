@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/orkaproj/active-monitor/api/v1alpha1"
+	"github.com/keikoproj/active-monitor/api/v1alpha1"
 	"github.com/sirupsen/logrus"
 )
 
