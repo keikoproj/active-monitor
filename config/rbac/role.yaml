@@ -7,7 +7,7 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - activemonitor.orkaproj.io
+  - activemonitor.keikoproj.io
   resources:
   - healthchecks
   verbs:
@@ -19,7 +19,7 @@ rules:
   - patch
   - delete
 - apiGroups:
-  - activemonitor.orkaproj.io
+  - activemonitor.keikoproj.io
   resources:
   - healthchecks/status
   verbs:

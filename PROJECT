@@ -1,6 +1,6 @@
 version: "2"
-domain: orkaproj.io
-repo: github.com/orkaproj/active-monitor
+domain: keikoproj.io
+repo: github.com/keikoproj/active-monitor
 resources:
 - group: activemonitor
   version: v1alpha1
