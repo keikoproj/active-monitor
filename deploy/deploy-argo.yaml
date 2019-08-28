@@ -149,7 +149,7 @@ metadata:
   namespace: health
 data:
   config: |
-    instanceID: orka-workflows
+    instanceID: keiko-workflows
     namespace: health
 ---
 apiVersion: apps/v1beta2

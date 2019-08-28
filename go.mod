@@ -1,4 +1,4 @@
-module github.com/orkaproj/active-monitor
+module github.com/keikoproj/active-monitor
 
 go 1.12
 

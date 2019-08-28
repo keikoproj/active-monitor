@@ -22,7 +22,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	activemonitorv1alpha1 "github.com/orkaproj/active-monitor/api/v1alpha1"
+	activemonitorv1alpha1 "github.com/keikoproj/active-monitor/api/v1alpha1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"

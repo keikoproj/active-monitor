@@ -45,7 +45,7 @@ type HealthCheckStatus struct {
 }
 
 // +kubebuilder:object:root=true
-// +kubebuilder:resource:path=healthchecks,scope=Namespaced,shortName=hc
+// +kubebuilder:resource:path=healthchecks,scope=Namespaced,shortName=hc;hcs
 
 // HealthCheck is the Schema for the healthchecks API
 type HealthCheck struct {

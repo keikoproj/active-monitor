@@ -32,9 +32,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	activemonitorv1alpha1 "github.com/orkaproj/active-monitor/api/v1alpha1"
-	"github.com/orkaproj/active-monitor/metrics"
-	"github.com/orkaproj/active-monitor/store"
+	activemonitorv1alpha1 "github.com/keikoproj/active-monitor/api/v1alpha1"
+	"github.com/keikoproj/active-monitor/metrics"
+	"github.com/keikoproj/active-monitor/store"
 )
 
 const (
@@ -77,8 +77,8 @@ func ignoreNotFound(err error) error {
 	return err
 }
 
-// +kubebuilder:rbac:groups=activemonitor.orkaproj.io,resources=healthchecks,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=activemonitor.orkaproj.io,resources=healthchecks/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=activemonitor.keikoproj.io,resources=healthchecks,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=activemonitor.keikoproj.io,resources=healthchecks/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=argoproj.io,resources=workflow;workflows,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile per kubebuilder v2 pattern
