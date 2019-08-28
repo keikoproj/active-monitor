@@ -30,7 +30,7 @@ metadata:
 rules:
 - apiGroups:
   - "*"
-  - activemonitor.orkaproj.io
+  - activemonitor.keikoproj.io
   resources:
   - workflows
   - monitors
