@@ -83,8 +83,8 @@ spec:
         name: activemonitor-controller
     spec:
       containers:
-        - name: activemonitor-controller
-          image: activemonitor-controller:latest
+        - name: active-monitor
+          image: keikoproj/active-monitor:latest
           imagePullPolicy: Always
           resources:
             requests:
