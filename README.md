@@ -42,12 +42,9 @@ The sort of HealthChecks one could run with Active-Monitor are:
 # step 1: install argo workflow controller
 kubectl apply -f https://raw.githubusercontent.com/keikoproj/active-monitor/master/deploy/deploy-argo.yaml
 
-# step 2: install active-monitor controller
+# step 2: install active-monitor CRD and start controller
 kubectl apply -f https://raw.githubusercontent.com/keikoproj/active-monitor/master/config/crd/bases/activemonitor.keikoproj.io_healthchecks.yaml
 kubectl apply -f https://raw.githubusercontent.com/keikoproj/active-monitor/master/deploy/deploy-active-monitor.yaml
-
-# step 3: run the controller via docker container (binding a volume and setting envVar for kubeconfig file)
-docker run -v ~/.kube/config:/root/.kube/config -e "KUBECONFIG=/root/.kube/config" keikoproj/active-monitor:latest
 ```
 
 ### Alternate Install - using locally cloned code
