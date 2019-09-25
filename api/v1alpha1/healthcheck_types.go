@@ -76,7 +76,7 @@ type ResourceObject struct {
 	// Namespace in which to create this object
 	// defaults to the service account namespace
 	Namespace      string `json:"namespace"`
-	ServiceAccount string `json:"serviceAccount"`
+	ServiceAccount string `json:"serviceAccount,omitempty"`
 	// Source of the K8 resource file(s)
 	Source ArtifactLocation `json:"source"`
 }
