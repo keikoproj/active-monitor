@@ -268,6 +268,11 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 	if ttlSecondAfterFinished := data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"]; ttlSecondAfterFinished == nil {
 		data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"] = defaultWorkflowTTLSec
 	}
+	// set service account, if specified
+	if hc.Spec.Workflow.Resource.ServiceAccount != "" {
+		data["spec"].(map[string]interface{})["serviceAccountName"] = hc.Spec.Workflow.Resource.ServiceAccount
+		log.Info("Set ServiceAccount on Workflow", "ServiceAccount", hc.Spec.Workflow.Resource.ServiceAccount)
+	}
 	// and since we will reschedule workflows ourselves, we don't need k8s to try to do so for us
 	var timeout int64
 	timeout = int64(hc.Spec.RepeatAfterSec)
