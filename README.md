@@ -12,12 +12,12 @@
 ## Motivation
 Active-Monitor is a Kubernetes custom resource controller which enables deep cluster monitoring using [Argo workflows](https://github.com/argoproj/argo).
 
-While it is not too difficult to know that all entities in a cluster are running indvidually, it is often quite challenging to know that they can all coordinate with each other as required for successful cluster operation (network connectivity, volume access, etc).
+While it is not too difficult to know that all entities in a cluster are running individually, it is often quite challenging to know that they can all coordinate with each other as required for successful cluster operation (network connectivity, volume access, etc).
 
 ## Overview
 Active-Monitor will create a new `health` namespace when installed in the cluster. Users can then create and submit HealthCheck objects to the Kubernetes server. A HealthCheck is essentially an instrumented wrapper around an Argo workflow.
 
-The workflow is run periodically, as definied by `repeatAfterSec` property in its spec, and watched by the Active-Monitor controller.
+The workflow is run periodically, as defined by `repeatAfterSec` property in its spec, and watched by the Active-Monitor controller.
 
 Active-Monitor sets the status of the HealthCheck CR to indicate whether the monitoring check succeeded or failed. External systems can query these CRs and take appropriate action if they failed.
 
@@ -143,9 +143,9 @@ Then visit: [http://127.0.0.1:8001](http://127.0.0.1:8001)
 
 Active-Monitor controller also exports metrics in Prometheus format which can be further used for notifications and alerting.
 
-Prometheus metrics are availabe on `:2112/metrics`
+Prometheus metrics are available on `:2112/metrics`
 ```
-kubectl -n health port-forward deployment/active-monitor-controller 2112:2112
+kubectl -n health port-forward deployment/activemonitor-controller 2112:2112
 ```
 Then visit: [http://localhost:2112/metrics](http://localhost:2112/metrics)
 
@@ -155,7 +155,7 @@ Active-Monitor, by default, exports following Promethus metrics:
 - `healthcheck_error_count` - The total number of errored monitor resources
 - `healthcheck_runtime_seconds` - Time taken for the workflow to complete
 
-Active-Monitor also supports custom metrics. For this to work, your workflow should export a global parameter. The parameter will be programatically available in the completed workflow object under: `workflow.status.outputs.parameters`.
+Active-Monitor also supports custom metrics. For this to work, your workflow should export a global parameter. The parameter will be programmatically available in the completed workflow object under: `workflow.status.outputs.parameters`.
 
 The global output parameters should look like below:
 ```
