@@ -173,6 +173,11 @@ The global output parameters should look like below:
 
 Please see [CONTRIBUTING.md](.github/CONTRIBUTING.md).
 
+To add a new example Healthcheck/workflow:
+
+1. If you're contributing a healthcheck; place it in the examples folder under the main project.
+2. If you're contributing a sample workflow; place it in the sub folder; workflows; under the examples folder.
+
 ## License
 The Apache 2 license is used in this project. Details can be found in the [LICENSE](./LICENSE) file.
 
