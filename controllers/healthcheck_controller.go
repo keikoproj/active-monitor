@@ -250,6 +250,7 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 	if hc.Spec.Workflow.Resource != nil {
 		reader, err := store.GetArtifactReader(&hc.Spec.Workflow.Resource.Source)
 		if err != nil {
+			log.Error(err, "Failed to get artifact reader")
 			return err
 		}
 		wfContent, err = reader.Read()
