@@ -57,49 +57,44 @@ func NewRegistry() *prometheus.Registry {
 
 // CreateDynamicPrometheusMetric initializes and registers custom metrics dynamically
 func CreateDynamicPrometheusMetric(name string, workflowStatus *wfv1.WorkflowStatus, registry *prometheus.Registry) {
-	if workflowStatus.Outputs != nil {
-		if workflowStatus.Outputs.Parameters != nil {
-			for _, parameter := range workflowStatus.Outputs.Parameters {
-				var jsonMap map[string][]interface{}
-				json.Unmarshal([]byte(*parameter.Value), &jsonMap)
-
-				for _, customMetricRaw := range jsonMap["metrics"] {
-					var metric customMetricMap
-					err := mapstructure.Decode(customMetricRaw.(map[string]interface{}), &metric)
-					if err != nil {
-						log.Errorf("Failed to decode metric for %s: %s", name, err.Error())
-						continue
-					}
-
-					if metric.Name == "" {
-						log.Errorf("Skipping metric collection. Invalid metric %s: %#v", name, metric)
-						continue
-					} else {
-						// replace "-" to "_" to make it Prometheus friendly metric names
-						metric.Name = strings.Replace(name, "-", "_", -1) + "_" + metric.Name
-					}
-
-					if _, ok := CustomGaugeMetricsMap[metric.Name]; !ok {
-						CustomGaugeMetricsMap[metric.Name] = prometheus.NewGaugeVec(
-							prometheus.GaugeOpts{
-								Name: metric.Name,
-								Help: metric.Help,
-							},
-							[]string{hcName},
-						)
-						err := registry.Register(
-							CustomGaugeMetricsMap[metric.Name],
-						)
-						if err != nil {
-							log.Errorf("Error registring %s metric %s\n", metric.Name, err.Error())
-						}
-					}
-					CustomGaugeMetricsMap[metric.Name].With(prometheus.Labels{hcName: name}).Set(metric.Value)
-					log.Printf("Successfully collected metric for %s, metric: %#v", name, metric)
-				}
-				log.Debugf("Here is the registered CustomGaugeMetricsMap %v\n", CustomGaugeMetricsMap)
-			}
-		}
+	if workflowStatus.Outputs == nil || workflowStatus.Outputs.Parameters == nil {
+		return
 	}
-	return
+
+	for _, parameter := range workflowStatus.Outputs.Parameters {
+		var jsonMap map[string][]interface{}
+		json.Unmarshal([]byte(*parameter.Value), &jsonMap)
+
+		for _, customMetricRaw := range jsonMap["metrics"] {
+			var metric customMetricMap
+			if err := mapstructure.Decode(customMetricRaw.(map[string]interface{}), &metric); err != nil {
+				log.Errorf("Failed to decode metric for %s: %s", name, err)
+				continue
+			}
+
+			if metric.Name == "" {
+				log.Errorf("Skipping metric collection. Invalid metric %s: %#v", name, metric)
+				continue
+			}
+
+			// replace "-" to "_" to make it Prometheus friendly metric names
+			metric.Name = strings.ReplaceAll(name, "-", "_") + "_" + metric.Name
+
+			if _, ok := CustomGaugeMetricsMap[metric.Name]; !ok {
+				CustomGaugeMetricsMap[metric.Name] = prometheus.NewGaugeVec(
+					prometheus.GaugeOpts{
+						Name: metric.Name,
+						Help: metric.Help,
+					},
+					[]string{hcName},
+				)
+				if err := registry.Register(CustomGaugeMetricsMap[metric.Name]); err != nil {
+					log.Errorf("Error registering %s metric %s\n", metric.Name, err)
+				}
+			}
+			CustomGaugeMetricsMap[metric.Name].With(prometheus.Labels{hcName: name}).Set(metric.Value)
+			log.Printf("Successfully collected metric for %s, metric: %#v", name, metric)
+		}
+		log.Debugf("Here is the registered CustomGaugeMetricsMap %v\n", CustomGaugeMetricsMap)
+	}
 }

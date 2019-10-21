@@ -426,7 +426,6 @@ spec:
                       type: object
                   required:
                   - namespace
-                  - serviceAccount
                   - source
                   type: object
               type: object
