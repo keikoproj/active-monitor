@@ -30,6 +30,12 @@ The sort of HealthChecks one could run with Active-Monitor are:
 - verify kube-dns by running DNS lookups on localhost
 - verify KIAM agent by running aws sts get-caller-identity on all available nodes
 
+With the Cluster/Namespace scoping healtcheck can be run in any namespace provided namespace is already created.
+The `level` in the workflow spec defines at which level the healtcheck runs it can be either namespace or cluster
+when level is set to namespace Active-Monitor will create a serviceaccount in the namespace as defined in the workflow spec, create the role and rolebinding with namespace level permissions so that the healthchecks in a namespace can be performed.
+
+When the `level` is set to be cluster the Active-Monitor will create a serviceaccount in the namespace as defined in the workflow spec, create the clusterrole and clusterrolebinding with cluster level permissions so that the healthchecks in a cluster scope can be performed.
+
 ## Dependencies
 * Kubernetes command line tool (kubectl)
 * Access to Kubernetes Cluster as specified in `~/.kube/config`
@@ -65,15 +71,17 @@ make run
 ## Usage and Examples
 Create a new healthcheck:
 
-`kubectl create -f https://raw.githubusercontent.com/keikoproj/active-monitor/master/examples/inlineHello.yaml`
+`kubectl create ns test`
+
+`kubectl create -f https://raw.githubusercontent.com/keikoproj/active-monitor/master/examples/inlineHello_ns.yaml`
 
 OR with local source code:
 
-`kubectl create -f examples/inlineHello.yaml`
+`kubectl create -f examples/inlineHello_ns.yaml`
 
 Then, list all healthchecks:
 
-`kubectl get healthcheck -n health` OR `kubectl get hc -n health`
+`kubectl get healthcheck -n test` OR `kubectl get hc -n test`
 
 ```
 NAME                 AGE
@@ -82,7 +90,7 @@ inline-hello-zz5vm   55s
 
 View additional details/status of a healthcheck:
 
-`kubectl describe healthcheck inline-hello-zz5vm -n health`
+`kubectl describe healthcheck inline-hello-zz5vm -n test`
 
 ```
 ...
@@ -95,6 +103,17 @@ Status:
 Events:                      <none>
 ```
 
+`argo list -n test`
+
+```                                                                                                            
+NAME                 STATUS      AGE   DURATION   PRIORITY
+inline-hello-88rh2   Succeeded   29s   7s         0
+inline-hello-xpsf5   Succeeded   1m    8s         0
+inline-hello-z8llk   Succeeded   2m    7s         0
+inline-hello-j48cn   Succeeded   3m    8s         0
+inline-hello-pcbhj   Succeeded   4m    7s         0
+inline-hello-45cql   Succeeded   6m    7s         0
+```
 ## Generates Resources
 * `activemonitor.keikoproj.io/v1alpha1/HealthCheck`
 * `argoproj.io/v1alpha1/Workflow`
