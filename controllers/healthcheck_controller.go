@@ -164,9 +164,9 @@ func (r *HealthCheckReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 			if err != nil {
 				log.Error(err, "Error creating NamespaceRole for the workflow")
 			}
-			log.Info("Successfully Created", "ClusterRole", nsrole)
+			log.Info("Successfully Created", "NamespaceRole", nsrole)
 
-			nsrb, err := r.CreateClusterRoleBinding(r.kubeclient, amnsrolebinding, nsrole, sa, wfNamespace)
+			nsrb, err := r.CreateNameSpaceRoleBinding(r.kubeclient, amnsrolebinding, nsrole, sa, wfNamespace)
 			if err != nil {
 				log.Error(err, "Error creating NamespaceRoleBinding for the workflow")
 			}
@@ -374,7 +374,7 @@ func (r *HealthCheckReconciler) CreateServiceAccount(clientset kubernetes.Interf
 // create a ClusterRole account
 func (r *HealthCheckReconciler) createClusterRole(clientset kubernetes.Interface, clusterrole string) (string, error) {
 	clusrole, err := clientset.RbacV1().ClusterRoles().Get(clusterrole, metav1.GetOptions{})
-	// If a clusrole already exists just re-use it
+	// If a Cluster Role already exists just re-use it
 	if err == nil {
 		return clusrole.Name, nil
 	}
@@ -402,7 +402,7 @@ func (r *HealthCheckReconciler) createClusterRole(clientset kubernetes.Interface
 // Create NamespaceRole
 func (r *HealthCheckReconciler) CreateNameSpaceRole(clientset kubernetes.Interface, nsrole string, namespace string) (string, error) {
 	nsrole1, err := clientset.RbacV1().Roles(namespace).Get(nsrole, metav1.GetOptions{})
-	// If a clusrole already exists just re-use it
+	// If a Namespace Role already exists just re-use it
 	if err == nil {
 		return nsrole1.Name, nil
 	}
@@ -427,7 +427,7 @@ func (r *HealthCheckReconciler) CreateNameSpaceRole(clientset kubernetes.Interfa
 }
 
 // Create a NamespaceRoleBinding
-func (r *HealthCheckReconciler) CreateNameSpaceRoleBinding(clientset kubernetes.Interface, rolebinding string, namespace string, serviceaccount string, nsrole string) (string, error) {
+func (r *HealthCheckReconciler) CreateNameSpaceRoleBinding(clientset kubernetes.Interface, rolebinding string, nsrole string, serviceaccount string, namespace string) (string, error) {
 	nsrb, err := clientset.RbacV1().RoleBindings(namespace).Get(rolebinding, metav1.GetOptions{})
 	// If a Namespace RoleBinding already exists just re-use it
 	if err == nil {
@@ -460,7 +460,7 @@ func (r *HealthCheckReconciler) CreateNameSpaceRoleBinding(clientset kubernetes.
 // Create a ClusterRoleBinding
 func (r *HealthCheckReconciler) CreateClusterRoleBinding(clientset kubernetes.Interface, clusterrolebinding string, clusterrole string, serviceaccount string, namespace string) (string, error) {
 	crb, err := clientset.RbacV1().ClusterRoleBindings().Get(clusterrolebinding, metav1.GetOptions{})
-	// If a Namespace RoleBinding already exists just re-use it
+	// If a Cluster RoleBinding already exists just re-use it
 	if err == nil {
 		return crb.Name, nil
 	}

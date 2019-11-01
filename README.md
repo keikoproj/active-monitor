@@ -34,7 +34,7 @@ With the Cluster/Namespace level, healthchecks can be run in any namespace provi
 The `level` in the `HealthCheck` spec defines at which level it runs; it can be either `Namespace` or `Cluster`.
 When `level` is set to `Namespace`, Active-Monitor will create a `ServiceAccount` in the namespace as defined in the workflow spec, it will also create the `Role` and `RoleBinding` with namespace level permissions so that the `HealthChecks` in a namespace can be performed.
 
-When the `level` is set to be cluster the Active-Monitor will create a serviceaccount in the namespace as defined in the workflow spec, it will also create the clusterrole and clusterrolebinding with cluster level permissions so that the healthchecks in a cluster scope can be performed.
+When the `level` is set to be `Cluster` the Active-Monitor will create a serviceaccount in the namespace as defined in the workflow spec, it will also create the clusterrole and clusterrolebinding with cluster level permissions so that the healthchecks in a cluster scope can be performed.
 
 ## Dependencies
 * Kubernetes command line tool (kubectl)
