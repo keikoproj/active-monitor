@@ -30,11 +30,11 @@ The sort of HealthChecks one could run with Active-Monitor are:
 - verify kube-dns by running DNS lookups on localhost
 - verify KIAM agent by running aws sts get-caller-identity on all available nodes
 
-With the Cluster/Namespace scoping healtcheck can be run in any namespace provided namespace is already created.
+With the Cluster/Namespace level, healtcheck can be run in any namespace provided namespace is already created.
 The `level` in the workflow spec defines at which level the healtcheck runs it can be either namespace or cluster
-when level is set to namespace Active-Monitor will create a serviceaccount in the namespace as defined in the workflow spec, create the role and rolebinding with namespace level permissions so that the healthchecks in a namespace can be performed.
+when `level` is set to namespace Active-Monitor will create a serviceaccount in the namespace as defined in the workflow spec, it will also create the role and rolebinding with namespace level permissions so that the healthchecks in a namespace can be performed.
 
-When the `level` is set to be cluster the Active-Monitor will create a serviceaccount in the namespace as defined in the workflow spec, create the clusterrole and clusterrolebinding with cluster level permissions so that the healthchecks in a cluster scope can be performed.
+When the `level` is set to be cluster the Active-Monitor will create a serviceaccount in the namespace as defined in the workflow spec, it will also create the clusterrole and clusterrolebinding with cluster level permissions so that the healthchecks in a cluster scope can be performed.
 
 ## Dependencies
 * Kubernetes command line tool (kubectl)
@@ -70,6 +70,44 @@ make run
 
 ## Usage and Examples
 Create a new healthcheck:
+
+## Example 1:
+
+Create a new healthcheck in healthcheck namespace:
+
+`kubectl create -f https://raw.githubusercontent.com/keikoproj/active-monitor/master/examples/inlineHello.yaml`
+
+OR with local source code:
+
+`kubectl create -f examples/inlineHello.yaml`
+
+Then, list all healthchecks:
+
+`kubectl get healthcheck -n health` OR `kubectl get hc -n health`
+
+```
+NAME                 AGE
+inline-hello-zz5vm   55s
+```
+
+View additional details/status of a healthcheck:
+
+`kubectl describe healthcheck inline-hello-zz5vm -n health`
+
+```
+...
+Status:
+  Failed Count:              0
+  Finished At:               2019-08-09T22:50:57Z
+  Last Successful Workflow:  inline-hello-4mwxf
+  Status:                    Succeeded
+  Success Count:             13
+Events:                      <none>
+```
+
+## Example 2:
+
+creating healthcheck in a new namespace
 
 `kubectl create ns test`
 
