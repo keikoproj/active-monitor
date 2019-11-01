@@ -30,7 +30,7 @@ The sort of HealthChecks one could run with Active-Monitor are:
 - verify kube-dns by running DNS lookups on localhost
 - verify KIAM agent by running aws sts get-caller-identity on all available nodes
 
-With the Cluster/Namespace level healtcheck can be run in any namespace provided namespace is already created.
+With the Cluster/Namespace level, healthchecks can be run in any namespace provided namespace is already created.
 The `level` in the `HealthCheck` spec defines at which level it runs; it can be either `Namespace` or `Cluster`.
 when `level` is set to namespace Active-Monitor will create a serviceaccount in the namespace as defined in the workflow spec, it will also create the role and rolebinding with namespace level permissions so that the healthchecks in a namespace can be performed.
 
