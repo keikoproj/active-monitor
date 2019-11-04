@@ -38,8 +38,10 @@ When `level` is set to `Namespace`, Active-Monitor will create a `ServiceAccount
 When the `level` is set to be `Cluster` the Active-Monitor will create a `ServiceAccount` in the namespace as defined in the workflow spec, it will also create the `Clusterrole` and `Clusterrolebinding` with cluster level permissions so that the healthchecks in a cluster scope can be performed.
 
 ## Dependencies
+* [Go Language tools](golang.org)
 * Kubernetes command line tool (kubectl)
 * Access to Kubernetes Cluster as specified in `~/.kube/config`
+  * Easiest option is to install [minikube](https://minikube.sigs.k8s.io/docs/start/) and ensure that `kubectl version` returns client and server info
 * [Argo Workflows Controller](https://github.com/argoproj/argo)
 
 ## Installation Guide
@@ -209,9 +211,9 @@ Then visit: [http://localhost:2112/metrics](http://localhost:2112/metrics)
 
 Active-Monitor, by default, exports following Promethus metrics:
 
-- `healthcheck_success_count` - The total number of successful monitor resources
-- `healthcheck_error_count` - The total number of errored monitor resources
-- `healthcheck_runtime_seconds` - Time taken for the workflow to complete
+- `healthcheck_success_count` - The total number of successful healthcheck resources
+- `healthcheck_error_count` - The total number of erred healthcheck resources
+- `healthcheck_runtime_seconds` - Time taken for the healthcheck's workflow to complete
 
 Active-Monitor also supports custom metrics. For this to work, your workflow should export a global parameter. The parameter will be programmatically available in the completed workflow object under: `workflow.status.outputs.parameters`.
 
