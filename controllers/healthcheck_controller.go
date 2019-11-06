@@ -24,7 +24,7 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/go-logr/logr"
 	"github.com/prometheus/client_golang/prometheus"
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
