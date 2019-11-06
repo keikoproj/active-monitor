@@ -155,7 +155,6 @@ NAME                 STATUS      AGE   DURATION   PRIORITY
 inline-hello-88rh2   Succeeded   29s   7s         0
 inline-hello-xpsf5   Succeeded   1m    8s         0
 inline-hello-z8llk   Succeeded   2m    7s         0
-inline-hello-pcbhj   Succeeded   4m    7s         0
 inline-hello-45cql   Succeeded   6m    7s         0
 ```
 ## Generates Resources
