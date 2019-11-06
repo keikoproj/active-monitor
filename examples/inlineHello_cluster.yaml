@@ -2,7 +2,7 @@ apiVersion: activemonitor.keikoproj.io/v1alpha1
 kind: HealthCheck
 metadata:
   generateName: inline-hello-
-  namespace: test
+  namespace: health
 spec:
   repeatAfterSec: 60 # duration in seconds
   level: cluster
