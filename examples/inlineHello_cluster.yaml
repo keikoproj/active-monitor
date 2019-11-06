@@ -9,7 +9,7 @@ spec:
   workflow:
     generateName: inline-hello-
     resource:
-      namespace: test # workflow will be submitted in this ns
+      namespace: health
       serviceAccount: testclsa
       source:
         inline: |
