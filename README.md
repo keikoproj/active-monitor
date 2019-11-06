@@ -111,7 +111,7 @@ Events:                      <none>
 
 ## Example 2:
 
-creating healthcheck in a new namespace
+Create a new healthcheck with namespace level bindings to specified serviceaccount and in a specified namespace:
 
 `kubectl create ns test`
 
