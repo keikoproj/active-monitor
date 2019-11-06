@@ -76,7 +76,7 @@ Create a new healthcheck:
 
 ## Example 1:
 
-Create a new healthcheck in healthcheck namespace:
+Create a new healthcheck with cluster level bindings to specified serviceaccount and in `health` namespace:
 
 `kubectl create -f https://raw.githubusercontent.com/keikoproj/active-monitor/master/examples/inlineHello.yaml`
 
