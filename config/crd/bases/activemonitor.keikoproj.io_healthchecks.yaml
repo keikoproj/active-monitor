@@ -390,10 +390,10 @@ spec:
           properties:
             description:
               type: string
+            level:
+              type: string
             repeatAfterSec:
               type: integer
-            scope:
-              type: string
             workflow:
               properties:
                 generateName:

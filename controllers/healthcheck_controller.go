@@ -24,11 +24,14 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/go-logr/logr"
 	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -66,6 +69,7 @@ var (
 type HealthCheckReconciler struct {
 	client.Client
 	DynClient          dynamic.Interface
+	kubeclient         *kubernetes.Clientset
 	Log                logr.Logger
 	RepeatTimersByName map[string]*time.Timer
 }
@@ -108,6 +112,8 @@ func (r *HealthCheckReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 		wfNamePrefix := hcSpec.Workflow.GenerateName
 		wfNamespace := hcSpec.Workflow.Resource.Namespace
 		repeatAfterSec := hcSpec.RepeatAfterSec
+		level := hcSpec.Level
+		sa := hcSpec.Workflow.Resource.ServiceAccount
 		now := metav1.Time{Time: time.Now()}
 		var finishedAtTime int64
 		if healthCheck.Status.FinishedAt != nil {
@@ -124,6 +130,52 @@ func (r *HealthCheckReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 			log.Info("Workflow already executed", "finishedAtTime", finishedAtTime)
 			return ctrl.Result{}, nil
 		}
+		if level == "cluster" {
+			amclusterrole := sa + "-cluster-role"
+			amclusterrolebinding := sa + "-cluster-role-binding"
+			servacc, err := r.CreateServiceAccount(r.kubeclient, sa, wfNamespace)
+			if err != nil {
+				log.Error(err, "Error creating ServiceAccount for the workflow")
+			}
+			log.Info("Successfully Created", "ServiceAccount", servacc)
+
+			clusrole, err := r.createClusterRole(r.kubeclient, amclusterrole)
+			if err != nil {
+				log.Error(err, "Error creating ClusterRole for the workflow")
+			}
+			log.Info("Successfully Created", "ClusterRole", clusrole)
+
+			crb, err := r.CreateClusterRoleBinding(r.kubeclient, amclusterrolebinding, clusrole, sa, wfNamespace)
+			if err != nil {
+				log.Error(err, "Error creating ClusterRoleBinding for the workflow")
+			}
+			log.Info("Successfully Created", "ClusterRoleBinding", crb)
+
+		} else if level == "namespace" {
+			amnsrole := sa + "-ns-role"
+			amnsrolebinding := sa + "-ns-role-binding"
+			servacc, err := r.CreateServiceAccount(r.kubeclient, sa, wfNamespace)
+			if err != nil {
+				log.Error(err, "Error creating ServiceAccount for the workflow")
+			}
+			log.Info("Successfully Created", "ServiceAccount", servacc)
+
+			nsrole, err := r.CreateNameSpaceRole(r.kubeclient, amnsrole, wfNamespace)
+			if err != nil {
+				log.Error(err, "Error creating NamespaceRole for the workflow")
+			}
+			log.Info("Successfully Created", "NamespaceRole", nsrole)
+
+			nsrb, err := r.CreateNameSpaceRoleBinding(r.kubeclient, amnsrolebinding, nsrole, sa, wfNamespace)
+			if err != nil {
+				log.Error(err, "Error creating NamespaceRoleBinding for the workflow")
+			}
+			log.Info("Successfully Created", "NamespaceRoleBinding", nsrb)
+
+		} else {
+			return ctrl.Result{}, nil
+		}
+
 		log.Info("Creating Workflow", "namespace", wfNamespace, "generateNamePrefix", wfNamePrefix)
 		generatedWfName, err := r.createSubmitWorkflow(ctx, log, &healthCheck)
 		if err != nil {
@@ -136,6 +188,7 @@ func (r *HealthCheckReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 
 // SetupWithManager as used in main package by kubebuilder v2.0.0.alpha4
 func (r *HealthCheckReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	r.kubeclient = kubernetes.NewForConfigOrDie(mgr.GetConfig())
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&activemonitorv1alpha1.HealthCheck{}).
 		Complete(r)
@@ -289,4 +342,149 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 	content["spec"] = spec
 	uwf.SetUnstructuredContent(content)
 	return nil
+}
+
+// Create ServiceAccount
+func (r *HealthCheckReconciler) CreateServiceAccount(clientset kubernetes.Interface, name string, namespace string) (string, error) {
+	sa, err := clientset.CoreV1().ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
+	// If a service account already exists just re-use it
+	if err == nil {
+		return sa.Name, nil
+	}
+
+	sa = &v1.ServiceAccount{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ServiceAccount",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+	}
+
+	sa, err = clientset.CoreV1().ServiceAccounts(namespace).Create(sa)
+	if err != nil {
+		return "", err
+	}
+
+	return sa.Name, nil
+}
+
+// create a ClusterRole account
+func (r *HealthCheckReconciler) createClusterRole(clientset kubernetes.Interface, clusterrole string) (string, error) {
+	clusrole, err := clientset.RbacV1().ClusterRoles().Get(clusterrole, metav1.GetOptions{})
+	// If a Cluster Role already exists just re-use it
+	if err == nil {
+		return clusrole.Name, nil
+	}
+	clusrole, err = clientset.RbacV1().ClusterRoles().Create(&rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: clusterrole,
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+
+				APIGroups: []string{"*"},
+				Resources: []string{"*"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+		},
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	return clusrole.Name, nil
+}
+
+// Create NamespaceRole
+func (r *HealthCheckReconciler) CreateNameSpaceRole(clientset kubernetes.Interface, nsrole string, namespace string) (string, error) {
+	nsrole1, err := clientset.RbacV1().Roles(namespace).Get(nsrole, metav1.GetOptions{})
+	// If a Namespace Role already exists just re-use it
+	if err == nil {
+		return nsrole1.Name, nil
+	}
+	nsrole1, err = clientset.RbacV1().Roles(namespace).Create(&rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      nsrole,
+			Namespace: namespace,
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"*"},
+				Resources: []string{"*"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return nsrole1.Name, nil
+}
+
+// Create a NamespaceRoleBinding
+func (r *HealthCheckReconciler) CreateNameSpaceRoleBinding(clientset kubernetes.Interface, rolebinding string, nsrole string, serviceaccount string, namespace string) (string, error) {
+	nsrb, err := clientset.RbacV1().RoleBindings(namespace).Get(rolebinding, metav1.GetOptions{})
+	// If a Namespace RoleBinding already exists just re-use it
+	if err == nil {
+		return nsrb.Name, nil
+	}
+	nsrb, err = clientset.RbacV1().RoleBindings(namespace).Create(&rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rolebinding,
+			Namespace: namespace,
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind: "ServiceAccount",
+				Name: serviceaccount,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			Kind:     "Role",
+			Name:     nsrole,
+			APIGroup: "rbac.authorization.k8s.io",
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return nsrb.Name, nil
+}
+
+// Create a ClusterRoleBinding
+func (r *HealthCheckReconciler) CreateClusterRoleBinding(clientset kubernetes.Interface, clusterrolebinding string, clusterrole string, serviceaccount string, namespace string) (string, error) {
+	crb, err := clientset.RbacV1().ClusterRoleBindings().Get(clusterrolebinding, metav1.GetOptions{})
+	// If a Cluster RoleBinding already exists just re-use it
+	if err == nil {
+		return crb.Name, nil
+	}
+	crb, err = clientset.RbacV1().ClusterRoleBindings().Create(&rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: clusterrolebinding,
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      serviceaccount,
+				Namespace: namespace,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			Kind:     "ClusterRole",
+			Name:     clusterrole,
+			APIGroup: "rbac.authorization.k8s.io",
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return crb.Name, nil
+
 }
