@@ -30,6 +30,13 @@ The sort of HealthChecks one could run with Active-Monitor are:
 - verify kube-dns by running DNS lookups on localhost
 - verify KIAM agent by running aws sts get-caller-identity on all available nodes
 
+With the Cluster/Namespace level, healthchecks can be run in any namespace provided namespace is already created.
+The `level` in the `HealthCheck` spec defines at which level it runs; it can be either `Namespace` or `Cluster`.
+
+When `level` is set to `Namespace`, Active-Monitor will create a `ServiceAccount` in the namespace as defined in the workflow spec, it will also create the `Role` and `RoleBinding` with namespace level permissions so that the `HealthChecks` in a namespace can be performed.
+
+When the `level` is set to be `Cluster` the Active-Monitor will create a `ServiceAccount` in the namespace as defined in the workflow spec, it will also create the `ClusterRole` and `ClusterRoleBinding` with cluster level permissions so that the `HealthChecks` in a cluster scope can be performed.
+
 ## Dependencies
 * [Go Language tools](golang.org)
 * Kubernetes command line tool (kubectl)
@@ -67,6 +74,10 @@ make run
 ## Usage and Examples
 Create a new healthcheck:
 
+## Example 1:
+
+Create a new healthcheck with cluster level bindings to specified serviceaccount and in `health` namespace:
+
 `kubectl create -f https://raw.githubusercontent.com/keikoproj/active-monitor/master/examples/inlineHello.yaml`
 
 OR with local source code:
@@ -97,6 +108,50 @@ Status:
 Events:                      <none>
 ```
 
+## Example 2:
+
+Create a new healthcheck with namespace level bindings to specified serviceaccount and in a specified namespace:
+
+`kubectl create ns test`
+
+`kubectl create -f https://raw.githubusercontent.com/keikoproj/active-monitor/master/examples/inlineHello_ns.yaml`
+
+OR with local source code:
+
+`kubectl create -f examples/inlineHello_ns.yaml`
+
+Then, list all healthchecks:
+
+`kubectl get healthcheck -n test` OR `kubectl get hc -n test`
+
+```
+NAME                 AGE
+inline-hello-zz5vm   55s
+```
+
+View additional details/status of a healthcheck:
+
+`kubectl describe healthcheck inline-hello-zz5vm -n test`
+
+```
+...
+Status:
+  Failed Count:              0
+  Finished At:               2019-08-09T22:50:57Z
+  Last Successful Workflow:  inline-hello-4mwxf
+  Status:                    Succeeded
+  Success Count:             13
+Events:                      <none>
+```
+
+`argo list -n test`
+
+```                                                                                                            
+NAME                 STATUS      AGE   DURATION   PRIORITY
+inline-hello-88rh2   Succeeded   29s   7s         0
+inline-hello-xpsf5   Succeeded   1m    8s         0
+inline-hello-z8llk   Succeeded   2m    7s         0
+```
 ## Generates Resources
 * `activemonitor.keikoproj.io/v1alpha1/HealthCheck`
 * `argoproj.io/v1alpha1/Workflow`

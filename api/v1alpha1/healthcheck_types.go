@@ -29,7 +29,7 @@ type HealthCheckSpec struct {
 	RepeatAfterSec int      `json:"repeatAfterSec"`
 	Description    string   `json:"description,omitempty"`
 	Workflow       Workflow `json:"workflow"`
-	Scope          string   `json:"scope,omitempty"` // defines if a workflow runs Namespace or Cluster scoped
+	Level          string   `json:"level,omitempty"` // defines if a workflow runs in a Namespace or Cluster level
 }
 
 // HealthCheckStatus defines the observed state of HealthCheck
