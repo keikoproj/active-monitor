@@ -90,23 +90,50 @@ func (r *HealthCheckReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 	ctx := context.Background()
 	log := r.Log.WithValues(hcKind, req.NamespacedName)
 
+	log.Info("Starting HealthCheck reconcile ...", "for this", "hc")
+
 	// initialize timers map if not already done
 	if r.RepeatTimersByName == nil {
 		r.RepeatTimersByName = make(map[string]*time.Timer)
 	}
 
-	var healthCheck activemonitorv1alpha1.HealthCheck
-	if err := r.Get(ctx, req.NamespacedName, &healthCheck); err != nil {
+	var healthCheck = &activemonitorv1alpha1.HealthCheck{}
+	if err := r.Get(ctx, req.NamespacedName, healthCheck); err != nil {
 		// if our healthcheck was deleted, this Reconcile method is invoked with an empty resource cache
 		// see: https://book.kubebuilder.io/cronjob-tutorial/controller-implementation.html#1-load-the-cronjob-by-name
-		log.Info("Healthcheck object not found for reconciliation, likely deleted")
+		log.Info("Healthcheck object not found for reconciliation, likely deleted", "deleted", "deleted")
 		// stop timer corresponding to next schedule run of workflow since parent healthcheck no longer exists
 		if r.RepeatTimersByName[req.NamespacedName.Name] != nil {
-			log.Info("Cancelling rescheduled workflow for this healthcheck due to deletion")
+			log.Info("Cancelling rescheduled workflow for this healthcheck due to deletion", "deleted", "deleted")
 			r.RepeatTimersByName[req.NamespacedName.Name].Stop()
 		}
 		return ctrl.Result{}, ignoreNotFound(err)
 	}
+
+	return r.execHealthCheck(ctx, req, log, healthCheck)
+}
+
+func (r *HealthCheckReconciler) execHealthCheck(ctx context.Context, req ctrl.Request, log logr.Logger, healthCheck *activemonitorv1alpha1.HealthCheck) (ctrl.Result, error) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Info("Error: Panic occurred during execAdd %s/%s due to %s", healthCheck.Name, err)
+		}
+	}()
+	// Process HealthCheck
+	ret, procErr := r.processHealthCheck(ctx, req, log, healthCheck)
+
+	err := r.Update(ctx, healthCheck)
+	if err != nil {
+		log.Error(err, "Error updating healthcheck resource")
+		// Force retry when status fails to update
+		return ctrl.Result{}, err
+	}
+
+	return ret, procErr
+}
+
+func (r *HealthCheckReconciler) processHealthCheck(ctx context.Context, req ctrl.Request, log logr.Logger, healthCheck *activemonitorv1alpha1.HealthCheck) (ctrl.Result, error) {
+
 	hcSpec := healthCheck.Spec
 	if hcSpec.Workflow.Resource != nil {
 		wfNamePrefix := hcSpec.Workflow.GenerateName
@@ -177,11 +204,11 @@ func (r *HealthCheckReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 		}
 
 		log.Info("Creating Workflow", "namespace", wfNamespace, "generateNamePrefix", wfNamePrefix)
-		generatedWfName, err := r.createSubmitWorkflow(ctx, log, &healthCheck)
+		generatedWfName, err := r.createSubmitWorkflow(ctx, log, healthCheck)
 		if err != nil {
 			log.Error(err, "Error creating or submitting workflow")
 		}
-		r.watchWorkflowReschedule(ctx, log, wfNamespace, generatedWfName, &healthCheck)
+		r.watchWorkflowReschedule(ctx, log, wfNamespace, generatedWfName, healthCheck)
 	}
 	return ctrl.Result{}, nil
 }
