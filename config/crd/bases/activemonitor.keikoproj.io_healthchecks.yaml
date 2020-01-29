@@ -449,6 +449,9 @@ spec:
               type: string
             lastSuccessfulWorkflow:
               type: string
+            startedAt:
+              format: date-time
+              type: string
             status:
               type: string
             successCount:

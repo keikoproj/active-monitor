@@ -32,6 +32,18 @@ var (
 	},
 		[]string{hcName},
 	)
+	MonitorStartedtime = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "healthcheck_starttime",
+		Help: "Time taken for the workflow to complete.",
+	},
+		[]string{hcName},
+	)
+	MonitorFinishedtime = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "healthcheck_finishedtime",
+		Help: "Time taken for the workflow to complete.",
+	},
+		[]string{hcName},
+	)
 
 	CustomGaugeMetricsMap = make(map[string]*prometheus.GaugeVec)
 )
@@ -52,6 +64,8 @@ func NewRegistry() *prometheus.Registry {
 	promRegistry.MustRegister(MonitorSuccess)
 	promRegistry.MustRegister(MonitorError)
 	promRegistry.MustRegister(MonitorRuntime)
+	promRegistry.MustRegister(MonitorStartedtime)
+	promRegistry.MustRegister(MonitorFinishedtime)
 	return promRegistry
 }
 
