@@ -6,6 +6,19 @@ metadata:
   creationTimestamp: null
   name: healthchecks.activemonitor.keikoproj.io
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.status
+    name: LATEST STATUS
+    type: string
+  - JSONPath: .status.successCount
+    name: 'SUCCESS CNT  '
+    type: string
+  - JSONPath: .status.failedCount
+    name: FAIL CNT
+    type: string
+  - JSONPath: .metadata.creationTimestamp
+    name: Age
+    type: date
   group: activemonitor.keikoproj.io
   names:
     kind: HealthCheck
@@ -14,6 +27,7 @@ spec:
     - hc
     - hcs
   scope: Namespaced
+  subresources: {}
   validation:
     openAPIV3Schema:
       description: HealthCheck is the Schema for the healthchecks API
