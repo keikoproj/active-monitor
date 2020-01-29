@@ -5,6 +5,7 @@ metadata:
   namespace: health
 spec:
   repeatAfterSec: 60 # duration in seconds
+  level: cluster
   workflow:
     generateName: inline-hello-
     resource:
