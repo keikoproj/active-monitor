@@ -287,7 +287,10 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, log
 			log.Info("Workflow status", "status", status["phase"])
 			if status["phase"] == succStr {
 				hc.Status.Status = succStr
+				hc.Status.StartedAt = &then
 				hc.Status.FinishedAt = &now
+				log.Info("Time:", "hc.Status.StartedAt:", hc.Status.StartedAt)
+				log.Info("Time:", "hc.Status.FinishedAt:", hc.Status.FinishedAt)
 				hc.Status.SuccessCount++
 				hc.Status.LastSuccessfulWorkflow = wfName
 				metrics.MonitorSuccess.With(prometheus.Labels{"healthcheck_name": hc.GetName()}).Inc()
@@ -297,6 +300,7 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, log
 				break
 			} else if status["phase"] == failStr {
 				hc.Status.Status = failStr
+				hc.Status.StartedAt = &then
 				hc.Status.FinishedAt = &now
 				hc.Status.LastFailedAt = &now
 				hc.Status.ErrorMessage = status["message"].(string)
