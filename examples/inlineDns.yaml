@@ -5,6 +5,7 @@ metadata:
   namespace: health
 spec:
   repeatAfterSec: 60 # duration in seconds
+  level: cluster
   description: "Monitor pod dns connections"
   workflow:
     generateName: dns-workflow-

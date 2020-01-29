@@ -46,6 +46,10 @@ type HealthCheckStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:path=healthchecks,scope=Namespaced,shortName=hc;hcs
+// +kubebuilder:printcolumn:name="LATEST STATUS",type=string,JSONPath=`.status.status`
+// +kubebuilder:printcolumn:name="SUCCESS CNT  ",type=string,JSONPath=`.status.successCount`
+// +kubebuilder:printcolumn:name="FAIL CNT",type=string,JSONPath=`.status.failedCount`
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // HealthCheck is the Schema for the healthchecks API
 type HealthCheck struct {
