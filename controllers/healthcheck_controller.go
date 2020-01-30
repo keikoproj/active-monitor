@@ -90,7 +90,7 @@ func (r *HealthCheckReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 	ctx := context.Background()
 	log := r.Log.WithValues(hcKind, req.NamespacedName)
 
-	log.Info("Starting HealthCheck reconcile ...", "for this", "hc")
+	log.Info("Starting HealthCheck reconcile for ...")
 
 	// initialize timers map if not already done
 	if r.RepeatTimersByName == nil {
