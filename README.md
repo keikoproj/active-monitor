@@ -89,8 +89,8 @@ Then, list all healthchecks:
 `kubectl get healthcheck -n health` OR `kubectl get hc -n health`
 
 ```
-NAME                 AGE
-inline-hello-zz5vm   55s
+NAME                 LATEST STATUS   SUCCESS CNT     FAIL CNT    AGE
+inline-hello-7nmzk   Succeeded        7               0          7m53s
 ```
 
 View additional details/status of a healthcheck:
@@ -125,8 +125,8 @@ Then, list all healthchecks:
 `kubectl get healthcheck -n test` OR `kubectl get hc -n test`
 
 ```
-NAME                 AGE
-inline-hello-zz5vm   55s
+NAME                 LATEST STATUS   SUCCESS CNT     FAIL CNT    AGE
+inline-hello-zz5vm  Succeeded         7               0          7m53s
 ```
 
 View additional details/status of a healthcheck:
