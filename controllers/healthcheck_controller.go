@@ -110,10 +110,10 @@ func (r *HealthCheckReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 		return ctrl.Result{}, ignoreNotFound(err)
 	}
 
-	return r.execHealthCheck(ctx, req, log, healthCheck)
+	return r.processOrRecoverHealthCheck(ctx, req, log, healthCheck)
 }
 
-func (r *HealthCheckReconciler) execHealthCheck(ctx context.Context, req ctrl.Request, log logr.Logger, healthCheck *activemonitorv1alpha1.HealthCheck) (ctrl.Result, error) {
+func (r *HealthCheckReconciler) processOrRecoverHealthCheck(ctx context.Context, req ctrl.Request, log logr.Logger, healthCheck *activemonitorv1alpha1.HealthCheck) (ctrl.Result, error) {
 	defer func() {
 		if err := recover(); err != nil {
 			log.Info("Error: Panic occurred during execAdd %s/%s due to %s", healthCheck.Name, healthCheck.Namespace, err)
