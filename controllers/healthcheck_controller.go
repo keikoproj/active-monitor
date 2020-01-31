@@ -90,8 +90,8 @@ func (r *HealthCheckReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 	ctx := context.Background()
 	log := r.Log.WithValues(hcKind, req.NamespacedName)
 
-	log.Info("Starting HealthCheck reconcile ...", "for this", "hc")
 
+	log.Info("Starting HealthCheck reconcile for ...")
 	// initialize timers map if not already done
 	if r.RepeatTimersByName == nil {
 		r.RepeatTimersByName = make(map[string]*time.Timer)
@@ -110,13 +110,13 @@ func (r *HealthCheckReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 		return ctrl.Result{}, ignoreNotFound(err)
 	}
 
-	return r.execHealthCheck(ctx, req, log, healthCheck)
+	return r.processOrRecoverHealthCheck(ctx, req, log, healthCheck)
 }
 
-func (r *HealthCheckReconciler) execHealthCheck(ctx context.Context, req ctrl.Request, log logr.Logger, healthCheck *activemonitorv1alpha1.HealthCheck) (ctrl.Result, error) {
+func (r *HealthCheckReconciler) processOrRecoverHealthCheck(ctx context.Context, req ctrl.Request, log logr.Logger, healthCheck *activemonitorv1alpha1.HealthCheck) (ctrl.Result, error) {
 	defer func() {
 		if err := recover(); err != nil {
-			log.Info("Error: Panic occurred during execAdd %s/%s due to %s", healthCheck.Name, err)
+			log.Info("Error: Panic occurred during execAdd %s/%s due to %s", healthCheck.Name, healthCheck.Namespace, err)
 		}
 	}()
 	// Process HealthCheck
