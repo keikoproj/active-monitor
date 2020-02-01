@@ -38,7 +38,7 @@ var (
 	},
 		[]string{hcName},
 	)
-	MonitorFinishedtime = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+	MonitorFinishedTime = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "healthcheck_finishedtime",
 		Help: "Time taken for the workflow to complete.",
 	},
