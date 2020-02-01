@@ -65,7 +65,7 @@ func NewRegistry() *prometheus.Registry {
 	promRegistry.MustRegister(MonitorError)
 	promRegistry.MustRegister(MonitorRuntime)
 	promRegistry.MustRegister(MonitorStartedtime)
-	promRegistry.MustRegister(MonitorFinishedtime)
+	promRegistry.MustRegister(MonitorFinishedTime)
 	return promRegistry
 }
 
