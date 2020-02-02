@@ -1,0 +1,31 @@
+apiVersion: activemonitor.keikoproj.io/v1alpha1
+kind: HealthCheck
+metadata:
+  generateName: inline-hello-
+  namespace: health
+spec:
+  scheduler:
+    cron: "@every 1m"  
+  level: cluster
+  workflow:
+    generateName: inline-hello-
+    resource:
+      namespace: health
+      serviceAccount: testclsa
+      source:
+        inline: |
+            apiVersion: argoproj.io/v1alpha1
+            kind: Workflow
+            metadata:
+              generateName: hello-world-
+            spec:
+              entrypoint: whalesay
+              templates:
+                -
+                  container:
+                    args:
+                      - "hello world"
+                    command:
+                      - cowsay
+                    image: "docker/whalesay:latest"
+                  name: whalesay

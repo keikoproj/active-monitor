@@ -24,6 +24,7 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/go-logr/logr"
 	"github.com/prometheus/client_golang/prometheus"
+	cron "github.com/robfig/cron/v3"
 	"k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -90,7 +91,7 @@ func (r *HealthCheckReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 	ctx := context.Background()
 	log := r.Log.WithValues(hcKind, req.NamespacedName)
 
-	log.Info("Starting HealthCheck reconcile ...", "for this", "hc")
+	log.Info("Starting HealthCheck reconcile for ...")
 
 	// initialize timers map if not already done
 	if r.RepeatTimersByName == nil {
@@ -101,22 +102,22 @@ func (r *HealthCheckReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 	if err := r.Get(ctx, req.NamespacedName, healthCheck); err != nil {
 		// if our healthcheck was deleted, this Reconcile method is invoked with an empty resource cache
 		// see: https://book.kubebuilder.io/cronjob-tutorial/controller-implementation.html#1-load-the-cronjob-by-name
-		log.Info("Healthcheck object not found for reconciliation, likely deleted", "deleted", "deleted")
+		log.Info("Healthcheck object not found for reconciliation, likely deleted")
 		// stop timer corresponding to next schedule run of workflow since parent healthcheck no longer exists
 		if r.RepeatTimersByName[req.NamespacedName.Name] != nil {
-			log.Info("Cancelling rescheduled workflow for this healthcheck due to deletion", "deleted", "deleted")
+			log.Info("Cancelling rescheduled workflow for this healthcheck due to deletion")
 			r.RepeatTimersByName[req.NamespacedName.Name].Stop()
 		}
 		return ctrl.Result{}, ignoreNotFound(err)
 	}
 
-	return r.execHealthCheck(ctx, req, log, healthCheck)
+	return r.processOrRecoverHealthCheck(ctx, req, log, healthCheck)
 }
 
-func (r *HealthCheckReconciler) execHealthCheck(ctx context.Context, req ctrl.Request, log logr.Logger, healthCheck *activemonitorv1alpha1.HealthCheck) (ctrl.Result, error) {
+func (r *HealthCheckReconciler) processOrRecoverHealthCheck(ctx context.Context, req ctrl.Request, log logr.Logger, healthCheck *activemonitorv1alpha1.HealthCheck) (ctrl.Result, error) {
 	defer func() {
 		if err := recover(); err != nil {
-			log.Info("Error: Panic occurred during execAdd %s/%s due to %s", healthCheck.Name, err)
+			log.Info("Error: Panic occurred during execAdd %s/%s due to %s", healthCheck.Name, healthCheck.Namespace, err)
 		}
 	}()
 	// Process HealthCheck
@@ -138,7 +139,6 @@ func (r *HealthCheckReconciler) processHealthCheck(ctx context.Context, req ctrl
 	if hcSpec.Workflow.Resource != nil {
 		wfNamePrefix := hcSpec.Workflow.GenerateName
 		wfNamespace := hcSpec.Workflow.Resource.Namespace
-		repeatAfterSec := hcSpec.RepeatAfterSec
 		level := hcSpec.Level
 		sa := hcSpec.Workflow.Resource.ServiceAccount
 		now := metav1.Time{Time: time.Now()}
@@ -146,17 +146,26 @@ func (r *HealthCheckReconciler) processHealthCheck(ctx context.Context, req ctrl
 		if healthCheck.Status.FinishedAt != nil {
 			finishedAtTime = healthCheck.Status.FinishedAt.Time.Unix()
 		}
+
 		// workflows can be paused by setting repeatAfterSec to <= 0.
-		if repeatAfterSec <= 0 {
-			log.Info("Workflow will be skipped due to repeatAfterSec value", "repeatAfterSec", repeatAfterSec)
+		if hcSpec.RepeatAfterSec <= 0 && healthCheck.Spec.Scheduler.Cron == "" {
+			log.Info("Workflow will be skipped due to repeatAfterSec value", "repeatAfterSec", hcSpec.RepeatAfterSec)
 			healthCheck.Status.Status = "Stopped"
-			healthCheck.Status.ErrorMessage = fmt.Sprintf("workflow execution is stopped due to spec.repeatAfterSec set to %d", repeatAfterSec)
+			healthCheck.Status.ErrorMessage = fmt.Sprintf("workflow execution is stopped due to spec.repeatAfterSec set to %d", hcSpec.RepeatAfterSec)
 			healthCheck.Status.FinishedAt = &now
 			return ctrl.Result{}, nil
-		} else if int(time.Now().Unix()-finishedAtTime) < repeatAfterSec {
+		} else if hcSpec.RepeatAfterSec <= 0 && healthCheck.Spec.Scheduler.Cron != "" {
+			scheduler, err := cron.ParseStandard(healthCheck.Spec.Scheduler.Cron)
+			if err != nil {
+				log.Error(err, "fail to parse cron")
+			}
+			healthCheck.Spec.RepeatAfterSec = int(scheduler.Next(time.Now()).Sub(time.Now())/time.Second) + 1
+			log.Info("Repeataftersec value is set", "Repeataftersec", healthCheck.Spec.RepeatAfterSec)
+		} else if int(time.Now().Unix()-finishedAtTime) < hcSpec.RepeatAfterSec {
 			log.Info("Workflow already executed", "finishedAtTime", finishedAtTime)
 			return ctrl.Result{}, nil
 		}
+
 		if level == "cluster" {
 			amclusterrole := sa + "-cluster-role"
 			amclusterrolebinding := sa + "-cluster-role-binding"
@@ -272,6 +281,7 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, log
 	var now metav1.Time
 	then := metav1.Time{Time: time.Now()}
 	repeatAfterSec := hc.Spec.RepeatAfterSec
+	log.Info("repeataftersec", "time set in watchWorkflowReschedule is:", repeatAfterSec)
 	for {
 		now = metav1.Time{Time: time.Now()}
 		// grab workflow object by name and check its status; update healthcheck accordingly
