@@ -159,7 +159,7 @@ func (r *HealthCheckReconciler) processHealthCheck(ctx context.Context, req ctrl
 			if err != nil {
 				log.Error(err, "fail to parse cron")
 			}
-			// The value from scheduler next and substracting from current time is in fraction as we convert to int it will be 1 less than 
+			// The value from scheduler next and substracting from current time is in fraction as we convert to int it will be 1 less than
 			// the intended reschedule so we need to add 1sec to get the actual value
 			healthCheck.Spec.RepeatAfterSec = int(scheduler.Next(time.Now()).Sub(time.Now())/time.Second) + 1
 			log.Info("Repeataftersec value is set", "Repeataftersec", healthCheck.Spec.RepeatAfterSec)
@@ -283,7 +283,6 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, log
 	var now metav1.Time
 	then := metav1.Time{Time: time.Now()}
 	repeatAfterSec := hc.Spec.RepeatAfterSec
-	log.Info("repeataftersec", "time set in watchWorkflowReschedule is:", repeatAfterSec)
 	for {
 		now = metav1.Time{Time: time.Now()}
 		// grab workflow object by name and check its status; update healthcheck accordingly
