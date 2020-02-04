@@ -31,7 +31,7 @@ type HealthCheckSpec struct {
 	Description    string        `json:"description,omitempty"`
 	Workflow       Workflow      `json:"workflow"`
 	Level          string        `json:"level,omitempty"`      // defines if a workflow runs in a Namespace or Cluster level
-	Scheduler      SchedulerSpec `json:"scheduler,,omitempty"` // Scheduler defines schedule rules to run HealthCheck
+	Scheduler      SchedulerSpec `json:"scheduler,omitempty"` // Scheduler defines schedule rules to run HealthCheck
 }
 
 // HealthCheckStatus defines the observed state of HealthCheck
