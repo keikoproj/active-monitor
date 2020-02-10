@@ -37,6 +37,7 @@ type HealthCheckSpec struct {
 // HealthCheckStatus defines the observed state of HealthCheck
 type HealthCheckStatus struct {
 	ErrorMessage           string       `json:"errorMessage,omitempty"`
+	StartedAt              *metav1.Time `json:"startedAt,omitempty"`
 	FinishedAt             *metav1.Time `json:"finishedAt,omitempty"`
 	LastFailedAt           *metav1.Time `json:"lastFailedAt,omitempty"`
 	LastFailedWorkflow     string       `json:"lastFailedWorkflow,omitempty"`
