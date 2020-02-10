@@ -288,20 +288,28 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, log
 			log.Info("Workflow status", "status", status["phase"])
 			if status["phase"] == succStr {
 				hc.Status.Status = succStr
+				hc.Status.StartedAt = &then
 				hc.Status.FinishedAt = &now
+				log.Info("Time:", "hc.Status.StartedAt:", hc.Status.StartedAt)
+				log.Info("Time:", "hc.Status.FinishedAt:", hc.Status.FinishedAt)
 				hc.Status.SuccessCount++
 				hc.Status.LastSuccessfulWorkflow = wfName
 				metrics.MonitorSuccess.With(prometheus.Labels{"healthcheck_name": hc.GetName()}).Inc()
 				metrics.MonitorRuntime.With(prometheus.Labels{"healthcheck_name": hc.GetName()}).Set(now.Time.Sub(then.Time).Seconds())
+				metrics.MonitorStartedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName()}).Set(float64(then.Unix()))
+				metrics.MonitorFinishedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName()}).Set(float64(hc.Status.FinishedAt.Unix()))
 				break
 			} else if status["phase"] == failStr {
 				hc.Status.Status = failStr
+				hc.Status.StartedAt = &then
 				hc.Status.FinishedAt = &now
 				hc.Status.LastFailedAt = &now
 				hc.Status.ErrorMessage = status["message"].(string)
 				hc.Status.FailedCount++
 				hc.Status.LastFailedWorkflow = wfName
 				metrics.MonitorError.With(prometheus.Labels{"healthcheck_name": hc.GetName()}).Inc()
+				metrics.MonitorStartedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName()}).Set(float64(then.Unix()))
+				metrics.MonitorFinishedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName()}).Set(float64(now.Time.Unix()))
 				break
 			}
 		}
