@@ -44,6 +44,6 @@ jobs:
       if: type = push
       script:
       - echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
-      - if [ $TRAVIS_TAG ]; then export IMG=keikoproj/active-monitor:$TRAVIS_TAG; else export IMG=keikoproj/active-monitor:$($TRAVIS_COMMIT | cut -c1-7); fi
+      - if [ $TRAVIS_TAG ]; then export IMG=keikoproj/active-monitor:$TRAVIS_TAG; else export IMG=keikoproj/active-monitor:$TRAVIS_COMMIT; fi
       - make docker-build
       - make docker-push
