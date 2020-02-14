@@ -230,10 +230,14 @@ The global output parameters should look like below:
 
 Please see [CONTRIBUTING.md](.github/CONTRIBUTING.md).
 
-To add a new example Healthcheck/workflow:
+To add a new example of a healthcheck and/or workflow:
 
-1. If you're contributing a healthcheck; place it in the examples folder under the main project.
-2. If you're contributing a sample workflow; place it in the sub folder; workflows; under the examples folder.
+* Healthcheck: place it in [`./examples`](./examples)
+* Workflow: place it in [`./examples/workflows`](./examples/workflows)
+
+## Release Process
+
+Please see [RELEASE](./RELEASE.md).
 
 ## License
 The Apache 2 license is used in this project. Details can be found in the [LICENSE](./LICENSE) file.
