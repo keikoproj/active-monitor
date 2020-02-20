@@ -30,7 +30,7 @@ type HealthCheckSpec struct {
 	RepeatAfterSec int           `json:"repeatAfterSec,omitempty"`
 	Description    string        `json:"description,omitempty"`
 	Workflow       Workflow      `json:"workflow"`
-	Level          string        `json:"level,omitempty"`      // defines if a workflow runs in a Namespace or Cluster level
+	Level          string        `json:"level,omitempty"`    // defines if a workflow runs in a Namespace or Cluster level
 	Scheduler      SchedulerSpec `json:"schedule,omitempty"` // Scheduler defines schedule rules to run HealthCheck
 }
 

@@ -25,7 +25,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/prometheus/client_golang/prometheus"
 	cron "github.com/robfig/cron/v3"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -147,22 +147,25 @@ func (r *HealthCheckReconciler) processHealthCheck(ctx context.Context, req ctrl
 			finishedAtTime = healthCheck.Status.FinishedAt.Time.Unix()
 		}
 
-		// workflows can be paused by setting repeatAfterSec to <= 0.
-		if hcSpec.RepeatAfterSec <= 0 && healthCheck.Spec.Scheduler.Cron == "" {
+		// workflows can be paused by setting repeatAfterSec to <= 0 and not specifying the schedule for cron.
+		if hcSpec.RepeatAfterSec <= 0 && hcSpec.Scheduler.Cron == "" {
 			log.Info("Workflow will be skipped due to repeatAfterSec value", "repeatAfterSec", hcSpec.RepeatAfterSec)
 			healthCheck.Status.Status = "Stopped"
-			healthCheck.Status.ErrorMessage = fmt.Sprintf("workflow execution is stopped due to spec.repeatAfterSec set to %d", hcSpec.RepeatAfterSec)
+			healthCheck.Status.ErrorMessage = fmt.Sprintf("workflow execution is stopped; either spec.RepeatAfterSec or spec.Scheduler must be provided. spec.RepeatAfterSec set to %d. spec.Scheduler set to %v+", hcSpec.RepeatAfterSec, hcSpec.Scheduler)
 			healthCheck.Status.FinishedAt = &now
 			return ctrl.Result{}, nil
-		} else if hcSpec.RepeatAfterSec <= 0 && healthCheck.Spec.Scheduler.Cron != "" {
-			scheduler, err := cron.ParseStandard(healthCheck.Spec.Scheduler.Cron)
+		} else if hcSpec.RepeatAfterSec <= 0 && hcSpec.Scheduler.Cron != "" {
+			log.Info("Workflow to be set with Scheduler", "Cron", hcSpec.Scheduler.Cron)
+			scheduler, err := cron.ParseStandard(hcSpec.Scheduler.Cron)
 			if err != nil {
 				log.Error(err, "fail to parse cron")
 			}
 			// The value from scheduler next and substracting from current time is in fraction as we convert to int it will be 1 less than
 			// the intended reschedule so we need to add 1sec to get the actual value
+			// we need to update the spec so have to healthCheck.Spec.RepeatAfterSec instead of local variable hcSpec
 			healthCheck.Spec.RepeatAfterSec = int(scheduler.Next(time.Now()).Sub(time.Now())/time.Second) + 1
-			log.Info("Repeataftersec value is set", "Repeataftersec", healthCheck.Spec.RepeatAfterSec)
+			// log.Info("spec.RepeatAfterSec value is set", "RepeatAfterSec", healthCheck.Spec.RepeatAfterSec)
+			log.Info("spec.RepeatAfterSec value is set", "RepeatAfterSec", healthCheck.Spec.RepeatAfterSec)
 		} else if int(time.Now().Unix()-finishedAtTime) < hcSpec.RepeatAfterSec {
 			log.Info("Workflow already executed", "finishedAtTime", finishedAtTime)
 			return ctrl.Result{}, nil

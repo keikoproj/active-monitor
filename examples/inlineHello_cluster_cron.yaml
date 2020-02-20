@@ -4,7 +4,7 @@ metadata:
   generateName: inline-hello-
   namespace: health
 spec:
-  scheduler:
+  schedule:
     cron: "@every 1m"  
   level: cluster
   workflow:

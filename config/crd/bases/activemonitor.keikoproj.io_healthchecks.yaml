@@ -408,7 +408,7 @@ spec:
               type: string
             repeatAfterSec:
               type: integer
-            scheduler:
+            schedule:
               properties:
                 cron:
                   description: 'cron expressions can be found here: https://godoc.org/github.com/robfig/cron'
