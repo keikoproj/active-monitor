@@ -25,13 +25,13 @@ import (
 // Important: Run "make" to regenerate code after modifying this file
 
 // HealthCheckSpec defines the desired state of HealthCheck
-// Either RepeatAfterSec or Scheduler must be defined for the health check to run
+// Either RepeatAfterSec or Schedule must be defined for the health check to run
 type HealthCheckSpec struct {
-	RepeatAfterSec int           `json:"repeatAfterSec,omitempty"`
-	Description    string        `json:"description,omitempty"`
-	Workflow       Workflow      `json:"workflow"`
-	Level          string        `json:"level,omitempty"`    // defines if a workflow runs in a Namespace or Cluster level
-	Scheduler      SchedulerSpec `json:"schedule,omitempty"` // Scheduler defines schedule rules to run HealthCheck
+	RepeatAfterSec int          `json:"repeatAfterSec,omitempty"`
+	Description    string       `json:"description,omitempty"`
+	Workflow       Workflow     `json:"workflow"`
+	Level          string       `json:"level,omitempty"`    // defines if a workflow runs in a Namespace or Cluster level
+	Schedule       ScheduleSpec `json:"schedule,omitempty"` // Schedule defines schedule rules to run HealthCheck
 }
 
 // HealthCheckStatus defines the observed state of HealthCheck
@@ -106,8 +106,8 @@ type URLArtifact struct {
 	VerifyCert bool   `json:"verifyCert,omitempty"`
 }
 
-// SchedulerSpec contains the cron expression
-type SchedulerSpec struct {
+// ScheduleSpec contains the cron expression
+type ScheduleSpec struct {
 	// cron expressions can be found here: https://godoc.org/github.com/robfig/cron
 	Cron string `json:"cron,omitempty"`
 }

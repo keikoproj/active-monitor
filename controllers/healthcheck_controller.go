@@ -148,23 +148,22 @@ func (r *HealthCheckReconciler) processHealthCheck(ctx context.Context, req ctrl
 		}
 
 		// workflows can be paused by setting repeatAfterSec to <= 0 and not specifying the schedule for cron.
-		if hcSpec.RepeatAfterSec <= 0 && hcSpec.Scheduler.Cron == "" {
+		if hcSpec.RepeatAfterSec <= 0 && hcSpec.Schedule.Cron == "" {
 			log.Info("Workflow will be skipped due to repeatAfterSec value", "repeatAfterSec", hcSpec.RepeatAfterSec)
 			healthCheck.Status.Status = "Stopped"
-			healthCheck.Status.ErrorMessage = fmt.Sprintf("workflow execution is stopped; either spec.RepeatAfterSec or spec.Scheduler must be provided. spec.RepeatAfterSec set to %d. spec.Scheduler set to %v+", hcSpec.RepeatAfterSec, hcSpec.Scheduler)
+			healthCheck.Status.ErrorMessage = fmt.Sprintf("workflow execution is stopped; either spec.RepeatAfterSec or spec.Schedule must be provided. spec.RepeatAfterSec set to %d. spec.Schedule set to %+v", hcSpec.RepeatAfterSec, hcSpec.Schedule)
 			healthCheck.Status.FinishedAt = &now
 			return ctrl.Result{}, nil
-		} else if hcSpec.RepeatAfterSec <= 0 && hcSpec.Scheduler.Cron != "" {
-			log.Info("Workflow to be set with Scheduler", "Cron", hcSpec.Scheduler.Cron)
-			scheduler, err := cron.ParseStandard(hcSpec.Scheduler.Cron)
+		} else if hcSpec.RepeatAfterSec <= 0 && hcSpec.Schedule.Cron != "" {
+			log.Info("Workflow to be set with Schedule", "Cron", hcSpec.Schedule.Cron)
+			schedule, err := cron.ParseStandard(hcSpec.Schedule.Cron)
 			if err != nil {
 				log.Error(err, "fail to parse cron")
 			}
-			// The value from scheduler next and substracting from current time is in fraction as we convert to int it will be 1 less than
+			// The value from schedule next and substracting from current time is in fraction as we convert to int it will be 1 less than
 			// the intended reschedule so we need to add 1sec to get the actual value
 			// we need to update the spec so have to healthCheck.Spec.RepeatAfterSec instead of local variable hcSpec
-			healthCheck.Spec.RepeatAfterSec = int(scheduler.Next(time.Now()).Sub(time.Now())/time.Second) + 1
-			// log.Info("spec.RepeatAfterSec value is set", "RepeatAfterSec", healthCheck.Spec.RepeatAfterSec)
+			healthCheck.Spec.RepeatAfterSec = int(schedule.Next(time.Now()).Sub(time.Now())/time.Second) + 1
 			log.Info("spec.RepeatAfterSec value is set", "RepeatAfterSec", healthCheck.Spec.RepeatAfterSec)
 		} else if int(time.Now().Unix()-finishedAtTime) < hcSpec.RepeatAfterSec {
 			log.Info("Workflow already executed", "finishedAtTime", finishedAtTime)
