@@ -408,6 +408,12 @@ spec:
               type: string
             repeatAfterSec:
               type: integer
+            schedule:
+              properties:
+                cron:
+                  description: 'cron expressions can be found here: https://godoc.org/github.com/robfig/cron'
+                  type: string
+              type: object
             workflow:
               properties:
                 generateName:
@@ -444,7 +450,6 @@ spec:
                   type: object
               type: object
           required:
-          - repeatAfterSec
           - workflow
           type: object
         status:

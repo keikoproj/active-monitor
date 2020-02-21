@@ -16,6 +16,7 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/prometheus/client_golang v0.9.0
 	github.com/prometheus/common v0.0.0-20180801064454-c7de2306084e
+	github.com/robfig/cron/v3 v3.0.1
 	github.com/sirupsen/logrus v1.4.2
 	golang.org/x/net v0.0.0-20190613194153-d28f0bde5980
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6 // indirect
