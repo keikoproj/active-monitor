@@ -45,8 +45,7 @@ var _ = Describe("HealthCheck", func() {
 	// your API definition.
 	// Avoid adding tests for vanilla CRUD operations because they would
 	// test Kubernetes API server, which isn't the goal here.
-	Context("Create API", func() {
-
+	Context("Create and Delete APIs", func() {
 		It("should create an object successfully", func() {
 
 			key = types.NamespacedName{
@@ -95,7 +94,7 @@ var _ = Describe("HealthCheck", func() {
 				},
 			}
 
-			By("creating an API obj")
+			By("creating a healthcheck obj")
 			Expect(k8sClient.Create(context.TODO(), created)).To(Succeed())
 
 			fetched = &HealthCheck{}
