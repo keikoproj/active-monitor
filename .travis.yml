@@ -8,13 +8,17 @@ git:
 
 env:
   global:
-    - GO111MODULE=on
+  - GO111MODULE=on
 
-install:
+cache:
+  directories:
+  - $GOPATH/pkg/mod
+
+before_install:
   # install dependencies needed by jobs
-  - wget https://github.com/kubernetes-sigs/kubebuilder/releases/download/v2.0.0-beta.0/kubebuilder_2.0.0-beta.0_linux_amd64.tar.gz
-  - tar -zxvf  kubebuilder_2.0.0-beta.0_linux_amd64.tar.gz
-  - sudo mv kubebuilder_2.0.0-beta.0_linux_amd64 /usr/local/kubebuilder
+  - wget https://github.com/kubernetes-sigs/kubebuilder/releases/download/v2.2.0/kubebuilder_2.2.0_linux_amd64.tar.gz
+  - tar -zxvf  kubebuilder_2.2.0_linux_amd64.tar.gz
+  - sudo mv kubebuilder_2.2.0_linux_amd64 /usr/local/kubebuilder
 
 jobs:
   include:
@@ -26,7 +30,7 @@ jobs:
     - stage: publish-image
       if: type = push
       script:
-      - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-      - export IMG=keikoproj/active-monitor:latest
+      - echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
+      - if [ $TRAVIS_TAG ]; then export IMG=keikoproj/active-monitor:$TRAVIS_TAG; else export IMG=keikoproj/active-monitor:$(echo $TRAVIS_COMMIT | cut -c-10); fi
       - make docker-build
       - make docker-push
