@@ -25,7 +25,7 @@ run: generate fmt vet
 install: manifests
 	kubectl apply -f config/crd/bases
 
-# Deploy controller in the configured Kubernetes cluster in ~/.kube/config
+# Deploy controller in the Kubernetes cluster configured at ~/.kube/config
 deploy: manifests
 	kubectl apply -f config/crd/bases
 	kustomize build config/default | kubectl apply -f -
