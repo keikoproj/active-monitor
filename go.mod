@@ -1,6 +1,6 @@
 module github.com/keikoproj/active-monitor
 
-go 1.12
+go 1.13
 
 require (
 	github.com/argoproj/argo v2.3.0+incompatible
