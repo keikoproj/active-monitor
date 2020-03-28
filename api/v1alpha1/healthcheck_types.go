@@ -25,16 +25,19 @@ import (
 // Important: Run "make" to regenerate code after modifying this file
 
 // HealthCheckSpec defines the desired state of HealthCheck
+// Either RepeatAfterSec or Schedule must be defined for the health check to run
 type HealthCheckSpec struct {
-	RepeatAfterSec int      `json:"repeatAfterSec"`
-	Description    string   `json:"description,omitempty"`
-	Workflow       Workflow `json:"workflow"`
-	Level          string   `json:"level,omitempty"` // defines if a workflow runs in a Namespace or Cluster level
+	RepeatAfterSec int          `json:"repeatAfterSec,omitempty"`
+	Description    string       `json:"description,omitempty"`
+	Workflow       Workflow     `json:"workflow"`
+	Level          string       `json:"level,omitempty"`    // defines if a workflow runs in a Namespace or Cluster level
+	Schedule       ScheduleSpec `json:"schedule,omitempty"` // Schedule defines schedule rules to run HealthCheck
 }
 
 // HealthCheckStatus defines the observed state of HealthCheck
 type HealthCheckStatus struct {
 	ErrorMessage           string       `json:"errorMessage,omitempty"`
+	StartedAt              *metav1.Time `json:"startedAt,omitempty"`
 	FinishedAt             *metav1.Time `json:"finishedAt,omitempty"`
 	LastFailedAt           *metav1.Time `json:"lastFailedAt,omitempty"`
 	LastFailedWorkflow     string       `json:"lastFailedWorkflow,omitempty"`
@@ -101,6 +104,12 @@ type FileArtifact struct {
 type URLArtifact struct {
 	Path       string `json:"path,omitempty"`
 	VerifyCert bool   `json:"verifyCert,omitempty"`
+}
+
+// ScheduleSpec contains the cron expression
+type ScheduleSpec struct {
+	// cron expressions can be found here: https://godoc.org/github.com/robfig/cron
+	Cron string `json:"cron,omitempty"`
 }
 
 func init() {
