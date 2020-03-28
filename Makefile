@@ -1,6 +1,7 @@
 
-# Image URL to use all building/pushing image targets
+# Image URL to use all building/pushing image targets (IMG will be overwritten during CI operations)
 IMG ?= keikoproj/active-monitor:latest
+LATEST_IMG ?= keikoproj/active-monitor:latest
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true"
 
@@ -24,7 +25,7 @@ run: generate fmt vet
 install: manifests
 	kubectl apply -f config/crd/bases
 
-# Deploy controller in the configured Kubernetes cluster in ~/.kube/config
+# Deploy controller in the Kubernetes cluster configured at ~/.kube/config
 deploy: manifests
 	kubectl apply -f config/crd/bases
 	kustomize build config/default | kubectl apply -f -
@@ -47,19 +48,20 @@ generate: controller-gen
 
 # Build the docker image
 docker-build: test
-	docker build . -t ${IMG}
+	docker build . -t ${IMG} -t ${LATEST_IMG}
 	@echo "updating kustomize image patch file for manager resource"
 	sed -i'' -e 's@image: .*@image: '"${IMG}"'@' ./config/default/manager_image_patch.yaml
 
 # Push the docker image
 docker-push:
 	docker push ${IMG}
+	docker push ${LATEST_IMG}
 
 # find or download controller-gen
 # download controller-gen if necessary
 controller-gen:
 ifeq (, $(shell which controller-gen))
-	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.2.0-beta.2
+	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.2.4
 CONTROLLER_GEN=$(shell go env GOPATH)/bin/controller-gen
 else
 CONTROLLER_GEN=$(shell which controller-gen)

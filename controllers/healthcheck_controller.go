@@ -24,7 +24,8 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/go-logr/logr"
 	"github.com/prometheus/client_golang/prometheus"
-	"k8s.io/api/core/v1"
+	cron "github.com/robfig/cron/v3"
+	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -138,7 +139,6 @@ func (r *HealthCheckReconciler) processHealthCheck(ctx context.Context, req ctrl
 	if hcSpec.Workflow.Resource != nil {
 		wfNamePrefix := hcSpec.Workflow.GenerateName
 		wfNamespace := hcSpec.Workflow.Resource.Namespace
-		repeatAfterSec := hcSpec.RepeatAfterSec
 		level := hcSpec.Level
 		sa := hcSpec.Workflow.Resource.ServiceAccount
 		now := metav1.Time{Time: time.Now()}
@@ -146,17 +146,30 @@ func (r *HealthCheckReconciler) processHealthCheck(ctx context.Context, req ctrl
 		if healthCheck.Status.FinishedAt != nil {
 			finishedAtTime = healthCheck.Status.FinishedAt.Time.Unix()
 		}
-		// workflows can be paused by setting repeatAfterSec to <= 0.
-		if repeatAfterSec <= 0 {
-			log.Info("Workflow will be skipped due to repeatAfterSec value", "repeatAfterSec", repeatAfterSec)
+
+		// workflows can be paused by setting repeatAfterSec to <= 0 and not specifying the schedule for cron.
+		if hcSpec.RepeatAfterSec <= 0 && hcSpec.Schedule.Cron == "" {
+			log.Info("Workflow will be skipped due to repeatAfterSec value", "repeatAfterSec", hcSpec.RepeatAfterSec)
 			healthCheck.Status.Status = "Stopped"
-			healthCheck.Status.ErrorMessage = fmt.Sprintf("workflow execution is stopped due to spec.repeatAfterSec set to %d", repeatAfterSec)
+			healthCheck.Status.ErrorMessage = fmt.Sprintf("workflow execution is stopped; either spec.RepeatAfterSec or spec.Schedule must be provided. spec.RepeatAfterSec set to %d. spec.Schedule set to %+v", hcSpec.RepeatAfterSec, hcSpec.Schedule)
 			healthCheck.Status.FinishedAt = &now
 			return ctrl.Result{}, nil
-		} else if int(time.Now().Unix()-finishedAtTime) < repeatAfterSec {
+		} else if hcSpec.RepeatAfterSec <= 0 && hcSpec.Schedule.Cron != "" {
+			log.Info("Workflow to be set with Schedule", "Cron", hcSpec.Schedule.Cron)
+			schedule, err := cron.ParseStandard(hcSpec.Schedule.Cron)
+			if err != nil {
+				log.Error(err, "fail to parse cron")
+			}
+			// The value from schedule next and substracting from current time is in fraction as we convert to int it will be 1 less than
+			// the intended reschedule so we need to add 1sec to get the actual value
+			// we need to update the spec so have to healthCheck.Spec.RepeatAfterSec instead of local variable hcSpec
+			healthCheck.Spec.RepeatAfterSec = int(schedule.Next(time.Now()).Sub(time.Now())/time.Second) + 1
+			log.Info("spec.RepeatAfterSec value is set", "RepeatAfterSec", healthCheck.Spec.RepeatAfterSec)
+		} else if int(time.Now().Unix()-finishedAtTime) < hcSpec.RepeatAfterSec {
 			log.Info("Workflow already executed", "finishedAtTime", finishedAtTime)
 			return ctrl.Result{}, nil
 		}
+
 		if level == "cluster" {
 			amclusterrole := sa + "-cluster-role"
 			amclusterrolebinding := sa + "-cluster-role-binding"
@@ -287,20 +300,28 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, log
 			log.Info("Workflow status", "status", status["phase"])
 			if status["phase"] == succStr {
 				hc.Status.Status = succStr
+				hc.Status.StartedAt = &then
 				hc.Status.FinishedAt = &now
+				log.Info("Time:", "hc.Status.StartedAt:", hc.Status.StartedAt)
+				log.Info("Time:", "hc.Status.FinishedAt:", hc.Status.FinishedAt)
 				hc.Status.SuccessCount++
 				hc.Status.LastSuccessfulWorkflow = wfName
 				metrics.MonitorSuccess.With(prometheus.Labels{"healthcheck_name": hc.GetName()}).Inc()
 				metrics.MonitorRuntime.With(prometheus.Labels{"healthcheck_name": hc.GetName()}).Set(now.Time.Sub(then.Time).Seconds())
+				metrics.MonitorStartedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName()}).Set(float64(then.Unix()))
+				metrics.MonitorFinishedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName()}).Set(float64(hc.Status.FinishedAt.Unix()))
 				break
 			} else if status["phase"] == failStr {
 				hc.Status.Status = failStr
+				hc.Status.StartedAt = &then
 				hc.Status.FinishedAt = &now
 				hc.Status.LastFailedAt = &now
 				hc.Status.ErrorMessage = status["message"].(string)
 				hc.Status.FailedCount++
 				hc.Status.LastFailedWorkflow = wfName
 				metrics.MonitorError.With(prometheus.Labels{"healthcheck_name": hc.GetName()}).Inc()
+				metrics.MonitorStartedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName()}).Set(float64(then.Unix()))
+				metrics.MonitorFinishedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName()}).Set(float64(now.Time.Unix()))
 				break
 			}
 		}
