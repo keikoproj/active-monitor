@@ -17,23 +17,16 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"os"
 
 	activemonitorv1alpha1 "github.com/keikoproj/active-monitor/api/v1alpha1"
 	"github.com/keikoproj/active-monitor/controllers"
-	"github.com/keikoproj/active-monitor/metrics"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	// +kubebuilder:scaffold:imports
-)
-
-const (
-	metricServerPath = "/metrics"
-	metricServerPort = 2112
 )
 
 var (
@@ -56,13 +49,6 @@ func main() {
 	flag.Parse()
 
 	ctrl.SetLogger(zap.Logger(true))
-
-	registry := metrics.NewRegistry()
-	config := metrics.PrometheusConfig{
-		Path: metricServerPath,
-		Port: fmt.Sprintf(":%d", metricServerPort),
-	}
-	go metrics.RunServer(config, registry, setupLog)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
