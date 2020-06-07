@@ -44,6 +44,7 @@ type HealthCheckStatus struct {
 	LastSuccessfulWorkflow string       `json:"lastSuccessfulWorkflow,omitempty"`
 	SuccessCount           int          `json:"successCount"`
 	FailedCount            int          `json:"failedCount"`
+	Total                  int          `json:"total"`
 	Status                 string       `json:"status,omitempty"`
 }
 
