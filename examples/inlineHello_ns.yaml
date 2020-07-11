@@ -2,15 +2,15 @@ apiVersion: activemonitor.keikoproj.io/v1alpha1
 kind: HealthCheck
 metadata:
   generateName: inline-hello-
-  namespace: health
+  namespace: test
 spec:
   repeatAfterSec: 60 # duration in seconds
-  level: cluster
+  level: namespace
   workflow:
     generateName: inline-hello-
     resource:
-      namespace: health # workflow will be submitted in this ns
-      serviceAccount: activemonitor-controller-sa # workflow will be submitted using this acct
+      namespace: test # workflow will be submitted in this ns
+      serviceAccount: testnssa
       source:
         inline: |
             apiVersion: argoproj.io/v1alpha1

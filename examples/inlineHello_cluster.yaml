@@ -9,8 +9,8 @@ spec:
   workflow:
     generateName: inline-hello-
     resource:
-      namespace: health # workflow will be submitted in this ns
-      serviceAccount: activemonitor-controller-sa # workflow will be submitted using this acct
+      namespace: health
+      serviceAccount: testclsa
       source:
         inline: |
             apiVersion: argoproj.io/v1alpha1

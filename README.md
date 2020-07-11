@@ -4,7 +4,7 @@
 [![PR](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)][GithubPrsUrl]
 [![slack](https://img.shields.io/badge/slack-join%20the%20conversation-ff69b4.svg)][SlackUrl]
 
-![version](https://img.shields.io/badge/version-0.1.0-blue.svg?cacheSeconds=2592000)
+![version](https://img.shields.io/badge/version-0.3.0-blue.svg?cacheSeconds=2592000)
 [![Build Status][BuildStatusImg]][BuildMasterUrl]
 [![codecov][CodecovImg]][CodecovUrl]
 [![Go Report Card][GoReportImg]][GoReportUrl]
@@ -30,9 +30,18 @@ The sort of HealthChecks one could run with Active-Monitor are:
 - verify kube-dns by running DNS lookups on localhost
 - verify KIAM agent by running aws sts get-caller-identity on all available nodes
 
+With the Cluster/Namespace level, healthchecks can be run in any namespace provided namespace is already created.
+The `level` in the `HealthCheck` spec defines at which level it runs; it can be either `Namespace` or `Cluster`.
+
+When `level` is set to `Namespace`, Active-Monitor will create a `ServiceAccount` in the namespace as defined in the workflow spec, it will also create the `Role` and `RoleBinding` with namespace level permissions so that the `HealthChecks` in a namespace can be performed.
+
+When the `level` is set to be `Cluster` the Active-Monitor will create a `ServiceAccount` in the namespace as defined in the workflow spec, it will also create the `ClusterRole` and `ClusterRoleBinding` with cluster level permissions so that the `HealthChecks` in a cluster scope can be performed.
+
 ## Dependencies
+* [Go Language tools](golang.org)
 * Kubernetes command line tool (kubectl)
 * Access to Kubernetes Cluster as specified in `~/.kube/config`
+  * Easiest option is to install [minikube](https://minikube.sigs.k8s.io/docs/start/) and ensure that `kubectl version` returns client and server info
 * [Argo Workflows Controller](https://github.com/argoproj/argo)
 
 ## Installation Guide
@@ -65,6 +74,10 @@ make run
 ## Usage and Examples
 Create a new healthcheck:
 
+## Example 1:
+
+Create a new healthcheck with cluster level bindings to specified serviceaccount and in `health` namespace:
+
 `kubectl create -f https://raw.githubusercontent.com/keikoproj/active-monitor/master/examples/inlineHello.yaml`
 
 OR with local source code:
@@ -76,8 +89,8 @@ Then, list all healthchecks:
 `kubectl get healthcheck -n health` OR `kubectl get hc -n health`
 
 ```
-NAME                 AGE
-inline-hello-zz5vm   55s
+NAME                 LATEST STATUS   SUCCESS CNT     FAIL CNT    AGE
+inline-hello-7nmzk   Succeeded        7               0          7m53s
 ```
 
 View additional details/status of a healthcheck:
@@ -95,6 +108,50 @@ Status:
 Events:                      <none>
 ```
 
+## Example 2:
+
+Create a new healthcheck with namespace level bindings to specified serviceaccount and in a specified namespace:
+
+`kubectl create ns test`
+
+`kubectl create -f https://raw.githubusercontent.com/keikoproj/active-monitor/master/examples/inlineHello_ns.yaml`
+
+OR with local source code:
+
+`kubectl create -f examples/inlineHello_ns.yaml`
+
+Then, list all healthchecks:
+
+`kubectl get healthcheck -n test` OR `kubectl get hc -n test`
+
+```
+NAME                 LATEST STATUS   SUCCESS CNT     FAIL CNT    AGE
+inline-hello-zz5vm  Succeeded         7               0          7m53s
+```
+
+View additional details/status of a healthcheck:
+
+`kubectl describe healthcheck inline-hello-zz5vm -n test`
+
+```
+...
+Status:
+  Failed Count:              0
+  Finished At:               2019-08-09T22:50:57Z
+  Last Successful Workflow:  inline-hello-4mwxf
+  Status:                    Succeeded
+  Success Count:             13
+Events:                      <none>
+```
+
+`argo list -n test`
+
+```                                                                                                            
+NAME                 STATUS      AGE   DURATION   PRIORITY
+inline-hello-88rh2   Succeeded   29s   7s         0
+inline-hello-xpsf5   Succeeded   1m    8s         0
+inline-hello-z8llk   Succeeded   2m    7s         0
+```
 ## Generates Resources
 * `activemonitor.keikoproj.io/v1alpha1/HealthCheck`
 * `argoproj.io/v1alpha1/Workflow`
@@ -151,9 +208,9 @@ Then visit: [http://localhost:2112/metrics](http://localhost:2112/metrics)
 
 Active-Monitor, by default, exports following Promethus metrics:
 
-- `healthcheck_success_count` - The total number of successful monitor resources
-- `healthcheck_error_count` - The total number of errored monitor resources
-- `healthcheck_runtime_seconds` - Time taken for the workflow to complete
+- `healthcheck_success_count` - The total number of successful healthcheck resources
+- `healthcheck_error_count` - The total number of erred healthcheck resources
+- `healthcheck_runtime_seconds` - Time taken for the healthcheck's workflow to complete
 
 Active-Monitor also supports custom metrics. For this to work, your workflow should export a global parameter. The parameter will be programmatically available in the completed workflow object under: `workflow.status.outputs.parameters`.
 
@@ -173,10 +230,14 @@ The global output parameters should look like below:
 
 Please see [CONTRIBUTING.md](.github/CONTRIBUTING.md).
 
-To add a new example Healthcheck/workflow:
+To add a new example of a healthcheck and/or workflow:
 
-1. If you're contributing a healthcheck; place it in the examples folder under the main project.
-2. If you're contributing a sample workflow; place it in the sub folder; workflows; under the examples folder.
+* Healthcheck: place it in [`./examples`](./examples)
+* Workflow: place it in [`./examples/workflows`](./examples/workflows)
+
+## Release Process
+
+Please see [RELEASE](./RELEASE.md).
 
 ## License
 The Apache 2 license is used in this project. Details can be found in the [LICENSE](./LICENSE) file.
