@@ -2,12 +2,12 @@ package metrics
 
 import (
 	"encoding/json"
-	"strings"
-
 	wfv1 "github.com/argoproj/argo/pkg/apis/workflow/v1alpha1"
 	"github.com/mitchellh/mapstructure"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
+	"strings"
 )
 
 var hcName = "healthcheck_name"
@@ -56,17 +56,9 @@ type customMetricMap struct {
 	Value      float64
 }
 
-// NewRegistry is a custom registry for metrics
-func NewRegistry() *prometheus.Registry {
-	// Metrics have to be registered to be exposed:
-	promRegistry := prometheus.NewRegistry() // local Registry so we don't get Go metrics, etc.
-
-	promRegistry.MustRegister(MonitorSuccess)
-	promRegistry.MustRegister(MonitorError)
-	promRegistry.MustRegister(MonitorRuntime)
-	promRegistry.MustRegister(MonitorStartedTime)
-	promRegistry.MustRegister(MonitorFinishedTime)
-	return promRegistry
+func init() {
+	// Register custom metrics with the global prometheus registry
+	metrics.Registry.MustRegister(MonitorSuccess, MonitorError, MonitorRuntime, MonitorStartedTime, MonitorFinishedTime)
 }
 
 // CreateDynamicPrometheusMetric initializes and registers custom metrics dynamically
