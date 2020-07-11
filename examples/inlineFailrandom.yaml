@@ -1,0 +1,28 @@
+apiVersion: activemonitor.keikoproj.io/v1alpha1
+kind: HealthCheck
+metadata:
+  generateName: fail-healthcheck-
+  namespace: health
+spec:
+  repeatAfterSec: 60 # duration in seconds
+  level: cluster
+  workflow:
+    generateName: fail-workflow-
+    resource:
+      namespace: health # workflow will be submitted in this ns
+      serviceAccount: activemonitor-controller-sa # workflow will be submitted using this
+      source:
+        inline: |
+            apiVersion: argoproj.io/v1alpha1
+            kind: Workflow
+            spec:
+              ttlSecondsAfterFinished: 60
+              entrypoint: start
+              templates:
+              - name: start
+                retryStrategy:
+                  limit: 1
+                container: 
+                  image: docker/whalesay:latest
+                  command: [/bin/bash, -c]
+                  args: ["P=(0 1); exit ${P[RANDOM%2]};"]    
