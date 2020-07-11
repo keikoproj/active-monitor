@@ -134,9 +134,12 @@ spec:
               type: string
             successCount:
               type: integer
+            total:
+              type: integer
           required:
           - failedCount
           - successCount
+          - total
           type: object
       type: object
   version: v1alpha1
