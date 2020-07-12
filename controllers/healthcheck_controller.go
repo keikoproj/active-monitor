@@ -139,8 +139,8 @@ func (r *HealthCheckReconciler) processHealthCheck(ctx context.Context, req ctrl
 	if hcSpec.Workflow.Resource != nil {
 		wfNamePrefix := hcSpec.Workflow.GenerateName
 		wfNamespace := hcSpec.Workflow.Resource.Namespace
-		level := hcSpec.Level
-		sa := hcSpec.Workflow.Resource.ServiceAccount
+		//level := hcSpec.Level
+		//sa := hcSpec.Workflow.Resource.ServiceAccount
 		now := metav1.Time{Time: time.Now()}
 		var finishedAtTime int64
 		if healthCheck.Status.FinishedAt != nil {
@@ -170,50 +170,10 @@ func (r *HealthCheckReconciler) processHealthCheck(ctx context.Context, req ctrl
 			return ctrl.Result{}, nil
 		}
 
-		if level == "cluster" {
-			amclusterrole := sa + "-cluster-role"
-			amclusterrolebinding := sa + "-cluster-role-binding"
-			servacc, err := r.CreateServiceAccount(r.kubeclient, sa, wfNamespace)
-			if err != nil {
-				log.Error(err, "Error creating ServiceAccount for the workflow")
-			}
-			log.Info("Successfully Created", "ServiceAccount", servacc)
-
-			clusrole, err := r.createClusterRole(r.kubeclient, amclusterrole)
-			if err != nil {
-				log.Error(err, "Error creating ClusterRole for the workflow")
-			}
-			log.Info("Successfully Created", "ClusterRole", clusrole)
-
-			crb, err := r.CreateClusterRoleBinding(r.kubeclient, amclusterrolebinding, clusrole, sa, wfNamespace)
-			if err != nil {
-				log.Error(err, "Error creating ClusterRoleBinding for the workflow")
-			}
-			log.Info("Successfully Created", "ClusterRoleBinding", crb)
-
-		} else if level == "namespace" {
-			amnsrole := sa + "-ns-role"
-			amnsrolebinding := sa + "-ns-role-binding"
-			servacc, err := r.CreateServiceAccount(r.kubeclient, sa, wfNamespace)
-			if err != nil {
-				log.Error(err, "Error creating ServiceAccount for the workflow")
-			}
-			log.Info("Successfully Created", "ServiceAccount", servacc)
-
-			nsrole, err := r.CreateNameSpaceRole(r.kubeclient, amnsrole, wfNamespace)
-			if err != nil {
-				log.Error(err, "Error creating NamespaceRole for the workflow")
-			}
-			log.Info("Successfully Created", "NamespaceRole", nsrole)
-
-			nsrb, err := r.CreateNameSpaceRoleBinding(r.kubeclient, amnsrolebinding, nsrole, sa, wfNamespace)
-			if err != nil {
-				log.Error(err, "Error creating NamespaceRoleBinding for the workflow")
-			}
-			log.Info("Successfully Created", "NamespaceRoleBinding", nsrb)
-
-		} else {
-			return ctrl.Result{}, nil
+		err := r.createRBACForWorkflow(log, healthCheck, "healthcheck")
+		if err != nil {
+			log.Error(err, "Error creating RBAC for HealthCheckWorkflow")
+			return ctrl.Result{}, err
 		}
 
 		log.Info("Creating Workflow", "namespace", wfNamespace, "generateNamePrefix", wfNamePrefix)
@@ -232,6 +192,156 @@ func (r *HealthCheckReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&activemonitorv1alpha1.HealthCheck{}).
 		Complete(r)
+}
+
+func (r *HealthCheckReconciler) createRBACForWorkflow(log logr.Logger, hc *activemonitorv1alpha1.HealthCheck, workFlowType string) error {
+	level := hc.Spec.Level
+	hcSa := hc.Spec.Workflow.Resource.ServiceAccount
+	if hcSa == hc.Spec.RemedyWorkflow.Resource.ServiceAccount {
+		hc.Spec.RemedyWorkflow.Resource.ServiceAccount = hcSa + "-remedy"
+	}
+	remedySa := hc.Spec.RemedyWorkflow.Resource.ServiceAccount
+	wfNamespace := hc.Spec.RemedyWorkflow.Resource.Namespace
+	amclusterRole := hcSa + "-cluster-role"
+	amclusterRoleBinding := hcSa + "-cluster-role-binding"
+	amclusterRemedyRole := remedySa + "-cluster-role"
+	amclusterRoleRemedyBinding := remedySa + "-cluster-role-binding"
+	amnsRole := hcSa + "-ns-role"
+	amnsRoleBinding := hcSa + "-ns-role-binding"
+	amnsRemedyRole := remedySa + "-ns-role"
+	amnsRemedyRoleBinding := remedySa + "-ns-role-binding"
+
+	if workFlowType != "remedy" {
+		servacc, err := r.createServiceAccount(r.kubeclient, hcSa, wfNamespace)
+		if err != nil {
+			log.Error(err, "Error creating ServiceAccount for the workflow")
+		}
+		log.Info("Successfully Created", "ServiceAccount", servacc)
+	} else {
+		servacc1, err := r.createServiceAccount(r.kubeclient, remedySa, wfNamespace)
+		if err != nil {
+			log.Error(err, "Error creating ServiceAccount for the workflow")
+		}
+		log.Info("Successfully Created", "ServiceAccount", servacc1)
+	}
+	if level == "cluster" {
+
+		if workFlowType != "remedy" {
+			clusrole, err := r.createClusterRole(r.kubeclient, amclusterRole)
+			if err != nil {
+				log.Error(err, "Error creating ClusterRole for the healthcheck workflow")
+			}
+			log.Info("Successfully Created", "ClusterRole", clusrole)
+
+			crb, err := r.createClusterRoleBinding(r.kubeclient, amclusterRoleBinding, amclusterRole, hcSa, wfNamespace)
+			if err != nil {
+				log.Error(err, "Error creating ClusterRoleBinding for the workflow")
+			}
+			log.Info("Successfully Created", "ClusterRoleBinding", crb)
+
+		} else {
+			clusrole1, err := r.createRemedyClusterRole(r.kubeclient, amclusterRemedyRole)
+			if err != nil {
+				log.Error(err, "Error creating ClusterRole for the remedy workflow")
+			}
+			log.Info("Successfully Created", "ClusterRole", clusrole1)
+
+			crb1, err := r.createClusterRoleBinding(r.kubeclient, amclusterRoleRemedyBinding, amclusterRemedyRole, remedySa, wfNamespace)
+			if err != nil {
+				log.Error(err, "Error creating ClusterRoleBinding for the workflow")
+			}
+			log.Info("Successfully Created", "ClusterRoleBinding", crb1)
+
+		}
+
+	} else if level == "namespace" {
+
+		if workFlowType != "remedy" {
+			nsRole, err := r.createNameSpaceRole(r.kubeclient, amnsRole, wfNamespace)
+			if err != nil {
+				log.Error(err, "Error creating NamespaceRole for the workflow")
+			}
+			log.Info("Successfully Created", "NamespaceRole", nsRole)
+
+			nsrb, err := r.createNameSpaceRoleBinding(r.kubeclient, amnsRoleBinding, amnsRole, hcSa, wfNamespace)
+			if err != nil {
+				log.Error(err, "Error creating NamespaceRoleBinding for the workflow")
+			}
+			log.Info("Successfully Created", "NamespaceRoleBinding", nsrb)
+
+		} else {
+			nsRole1, err := r.createRemedyNameSpaceRole(r.kubeclient, amnsRemedyRole, wfNamespace)
+			if err != nil {
+				log.Error(err, "Error creating NamespaceRole for the workflow")
+			}
+			log.Info("Successfully Created", "NamespaceRole", nsRole1)
+
+			nsrb1, err := r.createNameSpaceRoleBinding(r.kubeclient, amnsRemedyRoleBinding, amnsRemedyRole, remedySa, wfNamespace)
+			if err != nil {
+				log.Error(err, "Error creating NamespaceRoleBinding for the workflow")
+			}
+			log.Info("Successfully Created", "NamespaceRoleBinding", nsrb1)
+
+		}
+
+	} else {
+		err := errors.New("level is not set")
+		return err
+	}
+
+	return nil
+}
+
+func (r *HealthCheckReconciler) deleteRBACForWorkflow(log logr.Logger, hc *activemonitorv1alpha1.HealthCheck) error {
+	level := hc.Spec.Level
+	remedySa := hc.Spec.RemedyWorkflow.Resource.ServiceAccount
+	wfNamespace := hc.Spec.RemedyWorkflow.Resource.Namespace
+
+	amclusterRemedyRole := remedySa + "-cluster-role"
+	amclusterRoleRemedyBinding := remedySa + "-cluster-role-binding"
+
+	amnsRemedyRole := remedySa + "-ns-role"
+	amnsRemedyRoleBinding := remedySa + "-ns-role-binding"
+	err := r.DeleteServiceAccount(r.kubeclient, remedySa, wfNamespace)
+	if err != nil {
+		log.Error(err, "Error deleting ServiceAccount for the workflow")
+	}
+	log.Info("Successfully Deleted", "ServiceAccount", remedySa)
+
+	if level == "cluster" {
+
+		err = r.DeleteClusterRole(r.kubeclient, amclusterRemedyRole)
+		if err != nil {
+			log.Error(err, "Error creating ClusterRole for the workflow")
+		}
+		log.Info("Successfully Deleted", "ClusterRole", amclusterRemedyRole)
+
+		err = r.DeleteClusterRoleBinding(r.kubeclient, amclusterRoleRemedyBinding, amclusterRemedyRole, remedySa, wfNamespace)
+		if err != nil {
+			log.Error(err, "Error creating ClusterRoleBinding for the workflow")
+		}
+		log.Info("Successfully Created", "ClusterRoleBinding", amclusterRoleRemedyBinding)
+
+	} else if level == "namespace" {
+
+		err := r.DeleteNameSpaceRole(r.kubeclient, amnsRemedyRole, wfNamespace)
+		if err != nil {
+			log.Error(err, "Error creating NamespaceRole for the workflow")
+		}
+		log.Info("Successfully Deleted", "NamespaceRole", amnsRemedyRole)
+
+		err = r.DeleteNameSpaceRoleBinding(r.kubeclient, amnsRemedyRoleBinding, amnsRemedyRole, remedySa, wfNamespace)
+		if err != nil {
+			log.Error(err, "Error creating NamespaceRoleBinding for the workflow")
+		}
+		log.Info("Successfully Deleted", "NamespaceRoleBinding", amnsRemedyRoleBinding)
+
+	} else {
+		err := errors.New("level is not set")
+		return err
+	}
+
+	return nil
 }
 
 // this function exists to assist with how a function called by the timer.AfterFunc() method operates to call a
@@ -281,6 +391,36 @@ func (r *HealthCheckReconciler) createSubmitWorkflow(ctx context.Context, log lo
 	return generatedName, nil
 }
 
+func (r *HealthCheckReconciler) createSubmitRemedyWorkflow(ctx context.Context, log logr.Logger, hc *activemonitorv1alpha1.HealthCheck) (wfName string, err error) {
+	remedyWorkflow := &unstructured.Unstructured{}
+	r.parseRemedyWorkflowFromHealthcheck(log, hc, remedyWorkflow)
+	remedyWorkflow.SetGroupVersionKind(wfGvk)
+	remedyWorkflow.SetNamespace(hc.Spec.RemedyWorkflow.Resource.Namespace)
+	remedyWorkflow.SetGenerateName(hc.Spec.RemedyWorkflow.GenerateName)
+	// set the owner references for workflow
+	ownerReferences := remedyWorkflow.GetOwnerReferences()
+	trueVar := true
+	newRef := metav1.OwnerReference{
+		Kind:       hcKind,
+		APIVersion: hcVersion,
+		Name:       hc.GetName(),
+		UID:        hc.GetUID(),
+		Controller: &trueVar,
+	}
+	ownerReferences = append(ownerReferences, newRef)
+	remedyWorkflow.SetOwnerReferences(ownerReferences)
+	log.Info("Added new owner reference", "UID", newRef.UID)
+	// finally, attempt to create workflow using the kube client
+	err = r.Create(ctx, remedyWorkflow)
+	if err != nil {
+		log.Error(err, "Error creating remedyworkflow")
+		return "", err
+	}
+	generatedName := remedyWorkflow.GetName()
+	log.Info("Created remedyWorkflow", "generatedName", generatedName)
+	return generatedName, nil
+}
+
 func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, log logr.Logger, wfNamespace, wfName string, hc *activemonitorv1alpha1.HealthCheck) error {
 	var now metav1.Time
 	then := metav1.Time{Time: time.Now()}
@@ -307,10 +447,10 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, log
 				hc.Status.SuccessCount++
 				hc.Status.Total = hc.Status.SuccessCount + hc.Status.FailedCount
 				hc.Status.LastSuccessfulWorkflow = wfName
-				metrics.MonitorSuccess.With(prometheus.Labels{"healthcheck_name": hc.GetName()}).Inc()
-				metrics.MonitorRuntime.With(prometheus.Labels{"healthcheck_name": hc.GetName()}).Set(now.Time.Sub(then.Time).Seconds())
-				metrics.MonitorStartedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName()}).Set(float64(then.Unix()))
-				metrics.MonitorFinishedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName()}).Set(float64(hc.Status.FinishedAt.Unix()))
+				metrics.MonitorSuccess.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": "healthcheck"}).Inc()
+				metrics.MonitorRuntime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": "healthcheck"}).Set(now.Time.Sub(then.Time).Seconds())
+				metrics.MonitorStartedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": "healthcheck"}).Set(float64(then.Unix()))
+				metrics.MonitorFinishedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": "healthcheck"}).Set(float64(hc.Status.FinishedAt.Unix()))
 				break
 			} else if status["phase"] == failStr {
 				hc.Status.Status = failStr
@@ -321,9 +461,25 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, log
 				hc.Status.FailedCount++
 				hc.Status.Total = hc.Status.SuccessCount + hc.Status.FailedCount
 				hc.Status.LastFailedWorkflow = wfName
-				metrics.MonitorError.With(prometheus.Labels{"healthcheck_name": hc.GetName()}).Inc()
-				metrics.MonitorStartedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName()}).Set(float64(then.Unix()))
-				metrics.MonitorFinishedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName()}).Set(float64(now.Time.Unix()))
+				metrics.MonitorError.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": "healthcheck"}).Inc()
+				metrics.MonitorStartedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": "healthcheck"}).Set(float64(then.Unix()))
+				metrics.MonitorFinishedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": "healthcheck"}).Set(float64(now.Time.Unix()))
+				log.Info("Creating Workflow", "namespace", wfNamespace, "generateNamePrefix", hc.Spec.RemedyWorkflow.GenerateName)
+				err := r.createRBACForWorkflow(log, hc, "remedy")
+				if err != nil {
+					log.Error(err, "Error creating RBAC Permissions for Remedy Workflow")
+					break
+				}
+				generatedWfName, err := r.createSubmitRemedyWorkflow(ctx, log, hc)
+				if err != nil {
+					log.Error(err, "Error creating or submitting remedyworkflow")
+				}
+				r.watchRemedyWorkflow(log, wfNamespace, generatedWfName, hc)
+				//err = r.DeleteServiceAccount(r.kubeclient, hc.Spec.RemedyWorkflow.Resource.ServiceAccount, hc.Spec.RemedyWorkflow.Resource.Namespace)
+				err = r.deleteRBACForWorkflow(log, hc)
+				if err != nil {
+					log.Error(err, "Error Deleting ServiceAccount or RBAC of remedy workflow")
+				}
 				break
 			}
 		}
@@ -344,6 +500,59 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, log
 		r.RepeatTimersByName[hc.GetName()] = time.AfterFunc(time.Duration(repeatAfterSec)*time.Second, helper)
 		log.Info("Rescheduled workflow for next run", "namespace", wfNamespace, "name", wfName)
 	}
+	return nil
+}
+
+func (r *HealthCheckReconciler) watchRemedyWorkflow(log logr.Logger, wfNamespace, wfName string, hc *activemonitorv1alpha1.HealthCheck) error {
+	var now metav1.Time
+	then := metav1.Time{Time: time.Now()}
+	//repeatAfterSec := hc.Spec.RepeatAfterSec
+	for {
+		now = metav1.Time{Time: time.Now()}
+		// grab workflow object by name and check its status; update healthcheck accordingly
+		// do this once per second until the workflow reaches a terminal state (success/failure)
+		workflow, err := r.DynClient.Resource(wfGvr).Namespace(wfNamespace).Get(wfName, metav1.GetOptions{})
+		if err != nil {
+			// if the workflow wasn't found, it is most likely the case that its parent healthcheck was deleted
+			// we can swallow this error and simply not reschedule
+			return ignoreNotFound(err)
+		}
+		status, ok := workflow.UnstructuredContent()["status"].(map[string]interface{})
+		if ok {
+			log.Info("Workflow status", "status", status["phase"])
+			if status["phase"] == succStr {
+				hc.Status.RemedyStatus = succStr
+				hc.Status.RemedyStartedAt = &then
+				hc.Status.RemedyFinishedAt = &now
+				log.Info("Time:", "hc.Status.StartedAt:", hc.Status.RemedyStartedAt)
+				log.Info("Time:", "hc.Status.FinishedAt:", hc.Status.RemedyFinishedAt)
+				hc.Status.RemedySuccessCount++
+				hc.Status.RemedyTotal = hc.Status.RemedySuccessCount + hc.Status.RemedyFailedCount
+				hc.Status.LastSuccessfulWorkflow = wfName
+				metrics.MonitorSuccess.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": "remedy"}).Inc()
+				metrics.MonitorRuntime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": "remedy"}).Set(now.Time.Sub(then.Time).Seconds())
+				metrics.MonitorStartedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": "remedy"}).Set(float64(then.Unix()))
+				metrics.MonitorFinishedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": "remedy"}).Set(float64(hc.Status.FinishedAt.Unix()))
+				break
+			} else if status["phase"] == failStr {
+				hc.Status.RemedyStatus = failStr
+				hc.Status.RemedyStartedAt = &then
+				hc.Status.RemedyFinishedAt = &now
+				hc.Status.RemedyLastFailedAt = &now
+				hc.Status.RemedyErrorMessage = status["message"].(string)
+				hc.Status.RemedyFailedCount++
+				hc.Status.RemedyTotal = hc.Status.RemedySuccessCount + hc.Status.RemedyFailedCount
+				hc.Status.LastFailedWorkflow = wfName
+				metrics.MonitorError.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": "remedy"}).Inc()
+				metrics.MonitorStartedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": "remedy"}).Set(float64(then.Unix()))
+				metrics.MonitorFinishedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": "remedy"}).Set(float64(now.Time.Unix()))
+				break
+			}
+		}
+		// if not breaking out due to a terminal state, sleep and check again shortly
+		time.Sleep(time.Second)
+	}
+
 	return nil
 }
 
@@ -394,8 +603,55 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 	return nil
 }
 
+func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logger, hc *activemonitorv1alpha1.HealthCheck, uwf *unstructured.Unstructured) error {
+	var wfContent []byte
+	var data map[string]interface{}
+	if hc.Spec.RemedyWorkflow.Resource != nil {
+		reader, err := store.GetArtifactReader(&hc.Spec.RemedyWorkflow.Resource.Source)
+		if err != nil {
+			log.Error(err, "Failed to get artifact reader")
+			return err
+		}
+		wfContent, err = reader.Read()
+		if err != nil {
+			log.Error(err, "Failed to read content")
+			return err
+		}
+	}
+	// load workflow spec into data obj
+	if err := yaml.Unmarshal(wfContent, &data); err != nil {
+		log.Error(err, "Invalid spec file passed")
+		return err
+	}
+	content := uwf.UnstructuredContent()
+	// make sure workflows by default get cleaned up
+	if ttlSecondAfterFinished := data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"]; ttlSecondAfterFinished == nil {
+		data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"] = defaultWorkflowTTLSec
+	}
+	// set service account, if specified
+	if hc.Spec.RemedyWorkflow.Resource.ServiceAccount != "" {
+		data["spec"].(map[string]interface{})["serviceAccountName"] = hc.Spec.RemedyWorkflow.Resource.ServiceAccount
+		log.Info("Set ServiceAccount on Workflow", "ServiceAccount", hc.Spec.RemedyWorkflow.Resource.ServiceAccount)
+	}
+	// and since we will reschedule workflows ourselves, we don't need k8s to try to do so for us
+	var timeout int64
+	timeout = int64(hc.Spec.RepeatAfterSec)
+	if activeDeadlineSeconds := data["spec"].(map[string]interface{})["activeDeadlineSeconds"]; activeDeadlineSeconds == nil {
+		data["spec"].(map[string]interface{})["activeDeadlineSeconds"] = &timeout
+	}
+	spec, ok := data["spec"]
+	if !ok {
+		err := errors.New("Invalid workflow, missing spec")
+		log.Error(err, "Invalid workflow template spec")
+		return err
+	}
+	content["spec"] = spec
+	uwf.SetUnstructuredContent(content)
+	return nil
+}
+
 // Create ServiceAccount
-func (r *HealthCheckReconciler) CreateServiceAccount(clientset kubernetes.Interface, name string, namespace string) (string, error) {
+func (r *HealthCheckReconciler) createServiceAccount(clientset kubernetes.Interface, name string, namespace string) (string, error) {
 	sa, err := clientset.CoreV1().ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
 	// If a service account already exists just re-use it
 	if err == nil {
@@ -421,7 +677,23 @@ func (r *HealthCheckReconciler) CreateServiceAccount(clientset kubernetes.Interf
 	return sa.Name, nil
 }
 
-// create a ClusterRole account
+//Delete a service Account
+func (r *HealthCheckReconciler) DeleteServiceAccount(clientset kubernetes.Interface, name string, namespace string) error {
+	_, err := clientset.CoreV1().ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
+	// If a service account already exists just re-use it
+	if err != nil {
+		return err
+	}
+
+	err = clientset.CoreV1().ServiceAccounts(namespace).Delete(name, &metav1.DeleteOptions{})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// create a ClusterRole
 func (r *HealthCheckReconciler) createClusterRole(clientset kubernetes.Interface, clusterrole string) (string, error) {
 	clusrole, err := clientset.RbacV1().ClusterRoles().Get(clusterrole, metav1.GetOptions{})
 	// If a Cluster Role already exists just re-use it
@@ -449,8 +721,51 @@ func (r *HealthCheckReconciler) createClusterRole(clientset kubernetes.Interface
 	return clusrole.Name, nil
 }
 
+// create a ClusterRole
+func (r *HealthCheckReconciler) createRemedyClusterRole(clientset kubernetes.Interface, clusterrole string) (string, error) {
+	clusrole, err := clientset.RbacV1().ClusterRoles().Get(clusterrole, metav1.GetOptions{})
+	// If a Cluster Role already exists just re-use it
+	if err == nil {
+		return clusrole.Name, nil
+	}
+	clusrole, err = clientset.RbacV1().ClusterRoles().Create(&rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: clusterrole,
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"*"},
+				Resources: []string{"*"},
+				Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
+			},
+		},
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	return clusrole.Name, nil
+}
+
+// Delete a ClusterRole
+func (r *HealthCheckReconciler) DeleteClusterRole(clientset kubernetes.Interface, clusterrole string) error {
+	_, err := clientset.RbacV1().ClusterRoles().Get(clusterrole, metav1.GetOptions{})
+	// If a Cluster Role already exists just re-use it
+	if err != nil {
+		return err
+	}
+
+	err = clientset.RbacV1().ClusterRoles().Delete(clusterrole, &metav1.DeleteOptions{})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // Create NamespaceRole
-func (r *HealthCheckReconciler) CreateNameSpaceRole(clientset kubernetes.Interface, nsrole string, namespace string) (string, error) {
+func (r *HealthCheckReconciler) createNameSpaceRole(clientset kubernetes.Interface, nsrole string, namespace string) (string, error) {
 	nsrole1, err := clientset.RbacV1().Roles(namespace).Get(nsrole, metav1.GetOptions{})
 	// If a Namespace Role already exists just re-use it
 	if err == nil {
@@ -476,8 +791,51 @@ func (r *HealthCheckReconciler) CreateNameSpaceRole(clientset kubernetes.Interfa
 	return nsrole1.Name, nil
 }
 
+// Create NamespaceRole
+func (r *HealthCheckReconciler) createRemedyNameSpaceRole(clientset kubernetes.Interface, nsrole string, namespace string) (string, error) {
+	nsrole1, err := clientset.RbacV1().Roles(namespace).Get(nsrole, metav1.GetOptions{})
+	// If a Namespace Role already exists just re-use it
+	if err == nil {
+		return nsrole1.Name, nil
+	}
+	nsrole1, err = clientset.RbacV1().Roles(namespace).Create(&rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      nsrole,
+			Namespace: namespace,
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"*"},
+				Resources: []string{"*"},
+				Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
+			},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return nsrole1.Name, nil
+}
+
+// Delete NamespaceRole
+func (r *HealthCheckReconciler) DeleteNameSpaceRole(clientset kubernetes.Interface, nsrole string, namespace string) error {
+	// Check if a Namespace Role already exists
+	_, err := clientset.RbacV1().Roles(namespace).Get(nsrole, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	err = clientset.RbacV1().Roles(namespace).Delete(nsrole, &metav1.DeleteOptions{})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // Create a NamespaceRoleBinding
-func (r *HealthCheckReconciler) CreateNameSpaceRoleBinding(clientset kubernetes.Interface, rolebinding string, nsrole string, serviceaccount string, namespace string) (string, error) {
+func (r *HealthCheckReconciler) createNameSpaceRoleBinding(clientset kubernetes.Interface, rolebinding string, nsrole string, serviceaccount string, namespace string) (string, error) {
 	nsrb, err := clientset.RbacV1().RoleBindings(namespace).Get(rolebinding, metav1.GetOptions{})
 	// If a Namespace RoleBinding already exists just re-use it
 	if err == nil {
@@ -507,8 +865,23 @@ func (r *HealthCheckReconciler) CreateNameSpaceRoleBinding(clientset kubernetes.
 	return nsrb.Name, nil
 }
 
+// Delete NamespaceRoleBinding
+func (r *HealthCheckReconciler) DeleteNameSpaceRoleBinding(clientset kubernetes.Interface, rolebinding string, nsrole string, serviceaccount string, namespace string) error {
+	// Check if a Namespace RoleBinding exists
+	_, err := clientset.RbacV1().RoleBindings(namespace).Get(rolebinding, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	err = clientset.RbacV1().RoleBindings(namespace).Delete(rolebinding, &metav1.DeleteOptions{})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // Create a ClusterRoleBinding
-func (r *HealthCheckReconciler) CreateClusterRoleBinding(clientset kubernetes.Interface, clusterrolebinding string, clusterrole string, serviceaccount string, namespace string) (string, error) {
+func (r *HealthCheckReconciler) createClusterRoleBinding(clientset kubernetes.Interface, clusterrolebinding string, clusterrole string, serviceaccount string, namespace string) (string, error) {
 	crb, err := clientset.RbacV1().ClusterRoleBindings().Get(clusterrolebinding, metav1.GetOptions{})
 	// If a Cluster RoleBinding already exists just re-use it
 	if err == nil {
@@ -536,5 +909,22 @@ func (r *HealthCheckReconciler) CreateClusterRoleBinding(clientset kubernetes.In
 	}
 
 	return crb.Name, nil
+
+}
+
+// Delete ClusterRoleBinding
+func (r *HealthCheckReconciler) DeleteClusterRoleBinding(clientset kubernetes.Interface, clusterrolebinding string, clusterrole string, serviceaccount string, namespace string) error {
+	// Check if a Cluster RoleBinding exists
+	_, err := clientset.RbacV1().ClusterRoleBindings().Get(clusterrolebinding, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	err = clientset.RbacV1().ClusterRoleBindings().Delete(clusterrolebinding, &metav1.DeleteOptions{})
+	if err != nil {
+		return err
+	}
+
+	return nil
 
 }
