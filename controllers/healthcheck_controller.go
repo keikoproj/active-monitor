@@ -139,8 +139,6 @@ func (r *HealthCheckReconciler) processHealthCheck(ctx context.Context, req ctrl
 	if hcSpec.Workflow.Resource != nil {
 		wfNamePrefix := hcSpec.Workflow.GenerateName
 		wfNamespace := hcSpec.Workflow.Resource.Namespace
-		//level := hcSpec.Level
-		//sa := hcSpec.Workflow.Resource.ServiceAccount
 		now := metav1.Time{Time: time.Now()}
 		var finishedAtTime int64
 		if healthCheck.Status.FinishedAt != nil {
