@@ -57,7 +57,7 @@ spec:
             level:
               type: string
             remedyworkflow:
-              description: Workflow struct describes an Remedy Argo workflow
+              description: Workflow struct describes a Remedy workflow
               properties:
                 generateName:
                   type: string
@@ -183,7 +183,7 @@ spec:
               type: string
             remedySuccessCount:
               type: integer
-            remedyTotal:
+            remedyTotalRuns:
               type: integer
             remedyTriggeredAt:
               format: date-time
@@ -201,7 +201,7 @@ spec:
           - failedCount
           - remedyFailedCount
           - remedySuccessCount
-          - remedyTotal
+          - remedyTotalRuns
           - successCount
           - total
           type: object

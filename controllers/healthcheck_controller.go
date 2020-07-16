@@ -42,15 +42,18 @@ import (
 )
 
 const (
-	hcKind                = "HealthCheck"
-	hcVersion             = "v1alpha1"
-	wfGroup               = "argoproj.io"
-	wfVersion             = "v1alpha1"
-	wfKind                = "Workflow"
-	wfResource            = "workflows"
-	succStr               = "Succeeded"
-	failStr               = "Failed"
-	defaultWorkflowTTLSec = 1800
+	hcKind                    = "HealthCheck"
+	hcVersion                 = "v1alpha1"
+	wfGroup                   = "argoproj.io"
+	wfVersion                 = "v1alpha1"
+	wfKind                    = "Workflow"
+	wfResource                = "workflows"
+	succStr                   = "Succeeded"
+	failStr                   = "Failed"
+	defaultWorkflowTTLSec     = 1800
+	remedy                    = "remedy"
+	healthCheckClusterLevel   = "cluster"
+	healthCheckNamespaceLevel = "cluster"
 )
 
 var (
@@ -111,17 +114,18 @@ func (r *HealthCheckReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 		return ctrl.Result{}, ignoreNotFound(err)
 	}
 
-	return r.processOrRecoverHealthCheck(ctx, req, log, healthCheck)
+	return r.processOrRecoverHealthCheck(ctx, log, healthCheck)
 }
 
-func (r *HealthCheckReconciler) processOrRecoverHealthCheck(ctx context.Context, req ctrl.Request, log logr.Logger, healthCheck *activemonitorv1alpha1.HealthCheck) (ctrl.Result, error) {
-	defer func() {
-		if err := recover(); err != nil {
-			log.Info("Error: Panic occurred during execAdd %s/%s due to %s", healthCheck.Name, healthCheck.Namespace, err)
-		}
-	}()
+func (r *HealthCheckReconciler) processOrRecoverHealthCheck(ctx context.Context, log logr.Logger, healthCheck *activemonitorv1alpha1.HealthCheck) (ctrl.Result, error) {
+	//defer func() {
+	//	if err := recover(); err != nil {
+	//		//log.Info("Error: Panic occurred during execAdd", "Name:", healthCheck.Name, "NamespaceSpace:", healthCheck.Namespace, "error:", err)
+	//		log.Info("Error: Panic occurred during execAdd %s/%s due to %s", healthCheck.Name, healthCheck.Namespace, err)
+	//	}
+	//}()
 	// Process HealthCheck
-	ret, procErr := r.processHealthCheck(ctx, req, log, healthCheck)
+	ret, procErr := r.processHealthCheck(ctx, log, healthCheck)
 
 	err := r.Update(ctx, healthCheck)
 	if err != nil {
@@ -133,7 +137,7 @@ func (r *HealthCheckReconciler) processOrRecoverHealthCheck(ctx context.Context,
 	return ret, procErr
 }
 
-func (r *HealthCheckReconciler) processHealthCheck(ctx context.Context, req ctrl.Request, log logr.Logger, healthCheck *activemonitorv1alpha1.HealthCheck) (ctrl.Result, error) {
+func (r *HealthCheckReconciler) processHealthCheck(ctx context.Context, log logr.Logger, healthCheck *activemonitorv1alpha1.HealthCheck) (ctrl.Result, error) {
 
 	hcSpec := healthCheck.Spec
 	if hcSpec.Workflow.Resource != nil {
@@ -168,7 +172,7 @@ func (r *HealthCheckReconciler) processHealthCheck(ctx context.Context, req ctrl
 			return ctrl.Result{}, nil
 		}
 
-		err := r.createRBACForWorkflow(log, healthCheck, "healthcheck")
+		err := r.createRBACForWorkflow(log, healthCheck, hcKind)
 		if err != nil {
 			log.Error(err, "Error creating RBAC for HealthCheckWorkflow")
 			return ctrl.Result{}, err
@@ -178,8 +182,13 @@ func (r *HealthCheckReconciler) processHealthCheck(ctx context.Context, req ctrl
 		generatedWfName, err := r.createSubmitWorkflow(ctx, log, healthCheck)
 		if err != nil {
 			log.Error(err, "Error creating or submitting workflow")
+			return ctrl.Result{}, err
 		}
-		r.watchWorkflowReschedule(ctx, log, wfNamespace, generatedWfName, healthCheck)
+		err = r.watchWorkflowReschedule(ctx, log, wfNamespace, generatedWfName, healthCheck)
+		if err != nil {
+			log.Error(err, "Error executing Workflow")
+			return ctrl.Result{}, err
+		}
 	}
 	return ctrl.Result{}, nil
 }
@@ -195,45 +204,57 @@ func (r *HealthCheckReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *HealthCheckReconciler) createRBACForWorkflow(log logr.Logger, hc *activemonitorv1alpha1.HealthCheck, workFlowType string) error {
 	level := hc.Spec.Level
 	hcSa := hc.Spec.Workflow.Resource.ServiceAccount
-	if hcSa == hc.Spec.RemedyWorkflow.Resource.ServiceAccount {
-		hc.Spec.RemedyWorkflow.Resource.ServiceAccount = hcSa + "-remedy"
-	}
-	remedySa := hc.Spec.RemedyWorkflow.Resource.ServiceAccount
-	wfNamespace := hc.Spec.RemedyWorkflow.Resource.Namespace
+	wfNamespace := hc.Spec.Workflow.Resource.Namespace
 	amclusterRole := hcSa + "-cluster-role"
 	amclusterRoleBinding := hcSa + "-cluster-role-binding"
-	amclusterRemedyRole := remedySa + "-cluster-role"
-	amclusterRoleRemedyBinding := remedySa + "-cluster-role-binding"
 	amnsRole := hcSa + "-ns-role"
 	amnsRoleBinding := hcSa + "-ns-role-binding"
-	amnsRemedyRole := remedySa + "-ns-role"
-	amnsRemedyRoleBinding := remedySa + "-ns-role-binding"
+	var remedySa, amclusterRemedyRole, amclusterRoleRemedyBinding, amnsRemedyRole, amnsRemedyRoleBinding, wfRemedyNamespace string
+	if !hc.Spec.RemedyWorkflow.IsEmpty() {
+		if hc.Spec.RemedyWorkflow.Resource.ServiceAccount != "" {
+			if hcSa == hc.Spec.RemedyWorkflow.Resource.ServiceAccount {
+				hc.Spec.RemedyWorkflow.Resource.ServiceAccount = hcSa + "-remedy"
+			}
+			remedySa = hc.Spec.RemedyWorkflow.Resource.ServiceAccount
+			amclusterRemedyRole = remedySa + "-cluster-role"
+			amclusterRoleRemedyBinding = remedySa + "-cluster-role-binding"
+			amnsRemedyRole = remedySa + "-ns-role"
+			amnsRemedyRoleBinding = remedySa + "-ns-role-binding"
+			wfRemedyNamespace = hc.Spec.RemedyWorkflow.Resource.Namespace
+		} else {
+			return errors.New("ServiceAccount for the RemedyWorkflow is not specified")
+		}
+	}
 
-	if workFlowType != "remedy" {
+	if workFlowType != remedy {
 		servacc, err := r.createServiceAccount(r.kubeclient, hcSa, wfNamespace)
 		if err != nil {
 			log.Error(err, "Error creating ServiceAccount for the workflow")
+			return err
 		}
 		log.Info("Successfully Created", "ServiceAccount", servacc)
 	} else {
-		servacc1, err := r.createServiceAccount(r.kubeclient, remedySa, wfNamespace)
+		servacc1, err := r.createServiceAccount(r.kubeclient, remedySa, wfRemedyNamespace)
 		if err != nil {
 			log.Error(err, "Error creating ServiceAccount for the workflow")
+			return err
 		}
 		log.Info("Successfully Created", "ServiceAccount", servacc1)
 	}
-	if level == "cluster" {
+	if level == healthCheckClusterLevel {
 
-		if workFlowType != "remedy" {
+		if workFlowType != remedy {
 			clusrole, err := r.createClusterRole(r.kubeclient, amclusterRole)
 			if err != nil {
 				log.Error(err, "Error creating ClusterRole for the healthcheck workflow")
+				return err
 			}
 			log.Info("Successfully Created", "ClusterRole", clusrole)
 
 			crb, err := r.createClusterRoleBinding(r.kubeclient, amclusterRoleBinding, amclusterRole, hcSa, wfNamespace)
 			if err != nil {
 				log.Error(err, "Error creating ClusterRoleBinding for the workflow")
+				return err
 			}
 			log.Info("Successfully Created", "ClusterRoleBinding", crb)
 
@@ -241,50 +262,55 @@ func (r *HealthCheckReconciler) createRBACForWorkflow(log logr.Logger, hc *activ
 			clusrole1, err := r.createRemedyClusterRole(r.kubeclient, amclusterRemedyRole)
 			if err != nil {
 				log.Error(err, "Error creating ClusterRole for the remedy workflow")
+				return err
 			}
 			log.Info("Successfully Created", "ClusterRole", clusrole1)
 
-			crb1, err := r.createClusterRoleBinding(r.kubeclient, amclusterRoleRemedyBinding, amclusterRemedyRole, remedySa, wfNamespace)
+			crb1, err := r.createClusterRoleBinding(r.kubeclient, amclusterRoleRemedyBinding, amclusterRemedyRole, remedySa, wfRemedyNamespace)
 			if err != nil {
 				log.Error(err, "Error creating ClusterRoleBinding for the workflow")
+				return err
 			}
 			log.Info("Successfully Created", "ClusterRoleBinding", crb1)
 
 		}
 
-	} else if level == "namespace" {
+	} else if level == healthCheckNamespaceLevel {
 
-		if workFlowType != "remedy" {
+		if workFlowType != remedy {
 			nsRole, err := r.createNameSpaceRole(r.kubeclient, amnsRole, wfNamespace)
 			if err != nil {
 				log.Error(err, "Error creating NamespaceRole for the workflow")
+				return err
 			}
 			log.Info("Successfully Created", "NamespaceRole", nsRole)
 
 			nsrb, err := r.createNameSpaceRoleBinding(r.kubeclient, amnsRoleBinding, amnsRole, hcSa, wfNamespace)
 			if err != nil {
 				log.Error(err, "Error creating NamespaceRoleBinding for the workflow")
+				return err
 			}
 			log.Info("Successfully Created", "NamespaceRoleBinding", nsrb)
 
 		} else {
-			nsRole1, err := r.createRemedyNameSpaceRole(r.kubeclient, amnsRemedyRole, wfNamespace)
+			nsRole1, err := r.createRemedyNameSpaceRole(r.kubeclient, amnsRemedyRole, wfRemedyNamespace)
 			if err != nil {
 				log.Error(err, "Error creating NamespaceRole for the workflow")
+				return err
 			}
 			log.Info("Successfully Created", "NamespaceRole", nsRole1)
 
-			nsrb1, err := r.createNameSpaceRoleBinding(r.kubeclient, amnsRemedyRoleBinding, amnsRemedyRole, remedySa, wfNamespace)
+			nsrb1, err := r.createNameSpaceRoleBinding(r.kubeclient, amnsRemedyRoleBinding, amnsRemedyRole, remedySa, wfRemedyNamespace)
 			if err != nil {
 				log.Error(err, "Error creating NamespaceRoleBinding for the workflow")
+				return err
 			}
 			log.Info("Successfully Created", "NamespaceRoleBinding", nsrb1)
 
 		}
 
 	} else {
-		err := errors.New("level is not set")
-		return err
+		return errors.New("level is not set")
 	}
 
 	return nil
@@ -293,14 +319,14 @@ func (r *HealthCheckReconciler) createRBACForWorkflow(log logr.Logger, hc *activ
 func (r *HealthCheckReconciler) deleteRBACForWorkflow(log logr.Logger, hc *activemonitorv1alpha1.HealthCheck) error {
 	level := hc.Spec.Level
 	remedySa := hc.Spec.RemedyWorkflow.Resource.ServiceAccount
-	wfNamespace := hc.Spec.RemedyWorkflow.Resource.Namespace
+	wfRemedyNamespace := hc.Spec.RemedyWorkflow.Resource.Namespace
 
 	amclusterRemedyRole := remedySa + "-cluster-role"
 	amclusterRoleRemedyBinding := remedySa + "-cluster-role-binding"
 
 	amnsRemedyRole := remedySa + "-ns-role"
 	amnsRemedyRoleBinding := remedySa + "-ns-role-binding"
-	err := r.DeleteServiceAccount(r.kubeclient, remedySa, wfNamespace)
+	err := r.DeleteServiceAccount(r.kubeclient, remedySa, wfRemedyNamespace)
 	if err != nil {
 		log.Error(err, "Error deleting ServiceAccount for the workflow")
 	}
@@ -314,7 +340,7 @@ func (r *HealthCheckReconciler) deleteRBACForWorkflow(log logr.Logger, hc *activ
 		}
 		log.Info("Successfully Deleted", "ClusterRole", amclusterRemedyRole)
 
-		err = r.DeleteClusterRoleBinding(r.kubeclient, amclusterRoleRemedyBinding, amclusterRemedyRole, remedySa, wfNamespace)
+		err = r.DeleteClusterRoleBinding(r.kubeclient, amclusterRoleRemedyBinding, amclusterRemedyRole, remedySa, wfRemedyNamespace)
 		if err != nil {
 			log.Error(err, "Error creating ClusterRoleBinding for the workflow")
 		}
@@ -322,13 +348,13 @@ func (r *HealthCheckReconciler) deleteRBACForWorkflow(log logr.Logger, hc *activ
 
 	} else if level == "namespace" {
 
-		err := r.DeleteNameSpaceRole(r.kubeclient, amnsRemedyRole, wfNamespace)
+		err := r.DeleteNameSpaceRole(r.kubeclient, amnsRemedyRole, wfRemedyNamespace)
 		if err != nil {
 			log.Error(err, "Error creating NamespaceRole for the workflow")
 		}
 		log.Info("Successfully Deleted", "NamespaceRole", amnsRemedyRole)
 
-		err = r.DeleteNameSpaceRoleBinding(r.kubeclient, amnsRemedyRoleBinding, amnsRemedyRole, remedySa, wfNamespace)
+		err = r.DeleteNameSpaceRoleBinding(r.kubeclient, amnsRemedyRoleBinding, amnsRemedyRole, remedySa, wfRemedyNamespace)
 		if err != nil {
 			log.Error(err, "Error creating NamespaceRoleBinding for the workflow")
 		}
@@ -462,21 +488,12 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, log
 				metrics.MonitorError.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": "healthcheck"}).Inc()
 				metrics.MonitorStartedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": "healthcheck"}).Set(float64(then.Unix()))
 				metrics.MonitorFinishedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": "healthcheck"}).Set(float64(now.Time.Unix()))
-				log.Info("Creating Workflow", "namespace", wfNamespace, "generateNamePrefix", hc.Spec.RemedyWorkflow.GenerateName)
-				err := r.createRBACForWorkflow(log, hc, "remedy")
-				if err != nil {
-					log.Error(err, "Error creating RBAC Permissions for Remedy Workflow")
-					break
-				}
-				generatedWfName, err := r.createSubmitRemedyWorkflow(ctx, log, hc)
-				if err != nil {
-					log.Error(err, "Error creating or submitting remedyworkflow")
-				}
-				r.watchRemedyWorkflow(log, wfNamespace, generatedWfName, hc)
-				//err = r.DeleteServiceAccount(r.kubeclient, hc.Spec.RemedyWorkflow.Resource.ServiceAccount, hc.Spec.RemedyWorkflow.Resource.Namespace)
-				err = r.deleteRBACForWorkflow(log, hc)
-				if err != nil {
-					log.Error(err, "Error Deleting ServiceAccount or RBAC of remedy workflow")
+				if !hc.Spec.RemedyWorkflow.IsEmpty() {
+					err := r.processRemedyWorkflow(ctx, log, wfNamespace, hc)
+					if err != nil {
+						log.Error(err, "Error  executing RemedyWorkflow")
+						return err
+					}
 				}
 				break
 			}
@@ -501,10 +518,31 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, log
 	return nil
 }
 
-func (r *HealthCheckReconciler) watchRemedyWorkflow(log logr.Logger, wfNamespace, wfName string, hc *activemonitorv1alpha1.HealthCheck) error {
+func (r *HealthCheckReconciler) processRemedyWorkflow(ctx context.Context, log logr.Logger, wfNamespace string, hc *activemonitorv1alpha1.HealthCheck) error {
+
+	log.Info("Creating Workflow", "namespace", wfNamespace, "generateNamePrefix", hc.Spec.RemedyWorkflow.GenerateName)
+	err := r.createRBACForWorkflow(log, hc, remedy)
+	if err != nil {
+		log.Error(err, "Error creating RBAC Permissions for Remedy Workflow")
+		return err
+	}
+	generatedWfName, err := r.createSubmitRemedyWorkflow(ctx, log, hc)
+	if err != nil {
+		log.Error(err, "Error creating or submitting remedyworkflow")
+		return err
+	}
+	r.watchRemedyWorkflow(ctx, log, wfNamespace, generatedWfName, hc)
+	err = r.deleteRBACForWorkflow(log, hc)
+	if err != nil {
+		log.Error(err, "Error Deleting ServiceAccount or RBAC of remedy workflow")
+		return err
+	}
+	return nil
+}
+
+func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, log logr.Logger, wfNamespace string, wfName string, hc *activemonitorv1alpha1.HealthCheck) error {
 	var now metav1.Time
 	then := metav1.Time{Time: time.Now()}
-	//repeatAfterSec := hc.Spec.RepeatAfterSec
 	for {
 		now = metav1.Time{Time: time.Now()}
 		// grab workflow object by name and check its status; update healthcheck accordingly
@@ -525,12 +563,12 @@ func (r *HealthCheckReconciler) watchRemedyWorkflow(log logr.Logger, wfNamespace
 				log.Info("Time:", "hc.Status.StartedAt:", hc.Status.RemedyStartedAt)
 				log.Info("Time:", "hc.Status.FinishedAt:", hc.Status.RemedyFinishedAt)
 				hc.Status.RemedySuccessCount++
-				hc.Status.RemedyTotal = hc.Status.RemedySuccessCount + hc.Status.RemedyFailedCount
+				hc.Status.RemedyTotalRuns = hc.Status.RemedySuccessCount + hc.Status.RemedyFailedCount
 				hc.Status.LastSuccessfulWorkflow = wfName
-				metrics.MonitorSuccess.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": "remedy"}).Inc()
-				metrics.MonitorRuntime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": "remedy"}).Set(now.Time.Sub(then.Time).Seconds())
-				metrics.MonitorStartedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": "remedy"}).Set(float64(then.Unix()))
-				metrics.MonitorFinishedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": "remedy"}).Set(float64(hc.Status.FinishedAt.Unix()))
+				metrics.MonitorSuccess.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": remedy}).Inc()
+				metrics.MonitorRuntime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": remedy}).Set(now.Time.Sub(then.Time).Seconds())
+				metrics.MonitorStartedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": remedy}).Set(float64(then.Unix()))
+				metrics.MonitorFinishedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": remedy}).Set(float64(hc.Status.FinishedAt.Unix()))
 				break
 			} else if status["phase"] == failStr {
 				hc.Status.RemedyStatus = failStr
@@ -539,11 +577,11 @@ func (r *HealthCheckReconciler) watchRemedyWorkflow(log logr.Logger, wfNamespace
 				hc.Status.RemedyLastFailedAt = &now
 				hc.Status.RemedyErrorMessage = status["message"].(string)
 				hc.Status.RemedyFailedCount++
-				hc.Status.RemedyTotal = hc.Status.RemedySuccessCount + hc.Status.RemedyFailedCount
+				hc.Status.RemedyTotalRuns = hc.Status.RemedySuccessCount + hc.Status.RemedyFailedCount
 				hc.Status.LastFailedWorkflow = wfName
-				metrics.MonitorError.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": "remedy"}).Inc()
-				metrics.MonitorStartedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": "remedy"}).Set(float64(then.Unix()))
-				metrics.MonitorFinishedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": "remedy"}).Set(float64(now.Time.Unix()))
+				metrics.MonitorError.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": remedy}).Inc()
+				metrics.MonitorStartedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": remedy}).Set(float64(then.Unix()))
+				metrics.MonitorFinishedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": remedy}).Set(float64(now.Time.Unix()))
 				break
 			}
 		}

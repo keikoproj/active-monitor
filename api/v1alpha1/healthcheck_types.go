@@ -17,6 +17,7 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"reflect"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -51,7 +52,7 @@ type HealthCheckStatus struct {
 	FailedCount            int          `json:"failedCount"`
 	RemedySuccessCount     int          `json:"remedySuccessCount"`
 	RemedyFailedCount      int          `json:"remedyFailedCount"`
-	RemedyTotal            int          `json:"remedyTotal"`
+	RemedyTotalRuns        int          `json:"remedyTotalRuns"`
 	Total                  int          `json:"total"`
 	Status                 string       `json:"status,omitempty"`
 	RemedyStatus           string       `json:"remedyStatus,omitempty"`
@@ -82,10 +83,14 @@ type HealthCheckList struct {
 	Items           []HealthCheck `json:"items"`
 }
 
-// Workflow struct describes an Argo workflow
+// Workflow struct describes a Remedy workflow
 type RemedyWorkflow struct {
 	GenerateName string          `json:"generateName,omitempty"`
 	Resource     *ResourceObject `json:"resource,omitempty"`
+}
+
+func (w RemedyWorkflow) IsEmpty() bool {
+	return reflect.DeepEqual(w, RemedyWorkflow{})
 }
 
 // Workflow struct describes an Argo workflow
