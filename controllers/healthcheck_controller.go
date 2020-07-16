@@ -328,6 +328,7 @@ func (r *HealthCheckReconciler) deleteRBACForWorkflow(log logr.Logger, hc *activ
 	err := r.DeleteServiceAccount(r.kubeclient, remedySa, wfRemedyNamespace)
 	if err != nil {
 		log.Error(err, "Error deleting ServiceAccount for the workflow")
+		return err
 	}
 	log.Info("Successfully Deleted", "ServiceAccount", remedySa)
 
@@ -336,12 +337,14 @@ func (r *HealthCheckReconciler) deleteRBACForWorkflow(log logr.Logger, hc *activ
 		err = r.DeleteClusterRole(r.kubeclient, amclusterRemedyRole)
 		if err != nil {
 			log.Error(err, "Error creating ClusterRole for the workflow")
+			return err
 		}
 		log.Info("Successfully Deleted", "ClusterRole", amclusterRemedyRole)
 
 		err = r.DeleteClusterRoleBinding(r.kubeclient, amclusterRoleRemedyBinding, amclusterRemedyRole, remedySa, wfRemedyNamespace)
 		if err != nil {
 			log.Error(err, "Error creating ClusterRoleBinding for the workflow")
+			return err
 		}
 		log.Info("Successfully Created", "ClusterRoleBinding", amclusterRoleRemedyBinding)
 
@@ -350,6 +353,7 @@ func (r *HealthCheckReconciler) deleteRBACForWorkflow(log logr.Logger, hc *activ
 		err := r.DeleteNameSpaceRole(r.kubeclient, amnsRemedyRole, wfRemedyNamespace)
 		if err != nil {
 			log.Error(err, "Error creating NamespaceRole for the workflow")
+			return err
 		}
 		log.Info("Successfully Deleted", "NamespaceRole", amnsRemedyRole)
 
@@ -533,7 +537,7 @@ func (r *HealthCheckReconciler) processRemedyWorkflow(ctx context.Context, log l
 	r.watchRemedyWorkflow(ctx, log, wfNamespace, generatedWfName, hc)
 	err = r.deleteRBACForWorkflow(log, hc)
 	if err != nil {
-		log.Error(err, "Error Deleting ServiceAccount or RBAC of remedy workflow")
+		log.Error(err, "Error deleting  RBAC of remedy workflow")
 		return err
 	}
 	return nil
