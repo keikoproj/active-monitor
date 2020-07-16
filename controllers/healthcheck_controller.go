@@ -360,6 +360,7 @@ func (r *HealthCheckReconciler) deleteRBACForWorkflow(log logr.Logger, hc *activ
 		err = r.DeleteNameSpaceRoleBinding(r.kubeclient, amnsRemedyRoleBinding, amnsRemedyRole, remedySa, wfRemedyNamespace)
 		if err != nil {
 			log.Error(err, "Error creating NamespaceRoleBinding for the workflow")
+			return err
 		}
 		log.Info("Successfully Deleted", "NamespaceRoleBinding", amnsRemedyRoleBinding)
 
