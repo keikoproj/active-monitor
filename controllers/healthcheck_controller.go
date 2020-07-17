@@ -183,7 +183,7 @@ func (r *HealthCheckReconciler) processHealthCheck(ctx context.Context, log logr
 			log.Error(err, "Error creating or submitting workflow")
 			return ctrl.Result{}, err
 		}
-		err = r.watchWorkflowReschedule(ctx, log, wfNamespace, generatedWfName, healthCheck)
+		err = r.watchWorkflowReschedule(ctx, ctrl.Request{}, log, wfNamespace, generatedWfName, healthCheck)
 		if err != nil {
 			log.Error(err, "Error executing Workflow")
 			return ctrl.Result{}, err
@@ -382,7 +382,7 @@ func (r *HealthCheckReconciler) createSubmitWorkflowHelper(ctx context.Context, 
 		if err != nil {
 			log.Error(err, "Error creating or submitting workflow")
 		}
-		err = r.watchWorkflowReschedule(ctx, log, wfNamespace, wfName, hc)
+		err = r.watchWorkflowReschedule(ctx, ctrl.Request{}, log, wfNamespace, wfName, hc)
 		if err != nil {
 			log.Error(err, "Error watching or rescheduling workflow")
 		}
@@ -449,7 +449,7 @@ func (r *HealthCheckReconciler) createSubmitRemedyWorkflow(ctx context.Context, 
 	return generatedName, nil
 }
 
-func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, log logr.Logger, wfNamespace, wfName string, hc *activemonitorv1alpha1.HealthCheck) error {
+func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req ctrl.Request, log logr.Logger, wfNamespace, wfName string, hc *activemonitorv1alpha1.HealthCheck) error {
 	var now metav1.Time
 	then := metav1.Time{Time: time.Now()}
 	repeatAfterSec := hc.Spec.RepeatAfterSec
@@ -508,6 +508,16 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, log
 	// since the workflow has taken an unknown duration of time to complete, it's possible that its parent
 	// healthcheck may no longer exist; ensure that it still does before attempting to update it and reschedule
 	// see: https://book.kubebuilder.io/reference/using-finalizers.html
+	if err := r.Get(ctx, req.NamespacedName, hc); err != nil {
+		log.Info("Healthcheck object not found, likely deleted")
+		// stop timer corresponding to next schedule run of workflow since parent healthcheck no longer exists
+		if r.RepeatTimersByName[req.NamespacedName.Name] != nil {
+			log.Info("Cancelling rescheduled workflow for this healthcheck due to deletion")
+			r.RepeatTimersByName[req.NamespacedName.Name].Stop()
+		}
+		return errors.New("healthcheck object not found, likely deleted")
+	}
+
 	if hc.ObjectMeta.DeletionTimestamp.IsZero() {
 		// since the underlying workflow has completed, we update the healthcheck accordingly
 		err := r.Update(ctx, hc)
@@ -535,7 +545,11 @@ func (r *HealthCheckReconciler) processRemedyWorkflow(ctx context.Context, log l
 		log.Error(err, "Error creating or submitting remedyworkflow")
 		return err
 	}
-	r.watchRemedyWorkflow(ctx, log, wfNamespace, generatedWfName, hc)
+	err = r.watchRemedyWorkflow(ctx, ctrl.Request{}, log, wfNamespace, generatedWfName, hc)
+	if err != nil {
+		log.Error(err, "Error in  watchRemedyWorkflow of remedy workflow")
+		return err
+	}
 	err = r.deleteRBACForWorkflow(log, hc)
 	if err != nil {
 		log.Error(err, "Error deleting  RBAC of remedy workflow")
@@ -544,7 +558,7 @@ func (r *HealthCheckReconciler) processRemedyWorkflow(ctx context.Context, log l
 	return nil
 }
 
-func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, log logr.Logger, wfNamespace string, wfName string, hc *activemonitorv1alpha1.HealthCheck) error {
+func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctrl.Request, log logr.Logger, wfNamespace string, wfName string, hc *activemonitorv1alpha1.HealthCheck) error {
 	var now metav1.Time
 	then := metav1.Time{Time: time.Now()}
 	for {
@@ -591,6 +605,29 @@ func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, log log
 		}
 		// if not breaking out due to a terminal state, sleep and check again shortly
 		time.Sleep(time.Second)
+	}
+
+	// since the workflow has taken an unknown duration of time to complete, it's possible that its parent
+	// healthcheck may no longer exist; ensure that it still does before attempting to update it and reschedule
+	// see: https://book.kubebuilder.io/reference/using-finalizers.html
+	if err := r.Get(ctx, req.NamespacedName, hc); err != nil {
+		// if our healthcheck was deleted, this Reconcile method is invoked with an empty resource cache
+		// see: https://book.kubebuilder.io/cronjob-tutorial/controller-implementation.html#1-load-the-cronjob-by-name
+		log.Info("Healthcheck object not found for reconciliation, likely deleted")
+		// stop timer corresponding to next schedule run of workflow since parent healthcheck no longer exists
+		if r.RepeatTimersByName[req.NamespacedName.Name] != nil {
+			log.Info("Cancelling rescheduled workflow for this healthcheck due to deletion")
+			r.RepeatTimersByName[req.NamespacedName.Name].Stop()
+		}
+		return errors.New("healthcheck object not found for reconciliation, likely deleted")
+	}
+
+	if hc.ObjectMeta.DeletionTimestamp.IsZero() {
+		// since the underlying workflow has completed, we update the healthcheck accordingly
+		err := r.Update(ctx, hc)
+		if err != nil {
+			log.Error(err, "Error updating healthcheck resource")
+		}
 	}
 
 	return nil

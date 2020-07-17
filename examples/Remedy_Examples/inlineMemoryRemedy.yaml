@@ -35,9 +35,8 @@ spec:
         inline: |
           apiVersion: argoproj.io/v1alpha1
           kind: Workflow
-          metadata:
-            generateName: remedy-test-
           spec:
+            ttlSecondsAfterFinished: 60
             entrypoint: kubectl
             templates:
               -
