@@ -10,16 +10,17 @@
 [![Go Report Card][GoReportImg]][GoReportUrl]
 
 ## Motivation
-Active-Monitor is a Kubernetes custom resource controller which enables deep cluster monitoring using [Argo workflows](https://github.com/argoproj/argo).
+Active-Monitor is a Kubernetes custom resource controller which enables deep cluster monitoring and self-healing using [Argo workflows](https://github.com/argoproj/argo).
 
 While it is not too difficult to know that all entities in a cluster are running individually, it is often quite challenging to know that they can all coordinate with each other as required for successful cluster operation (network connectivity, volume access, etc).
 
 ## Overview
-Active-Monitor will create a new `health` namespace when installed in the cluster. Users can then create and submit HealthCheck objects to the Kubernetes server. A HealthCheck is essentially an instrumented wrapper around an Argo workflow.
+Active-Monitor will create a new `health` namespace when installed in the cluster. Users can then create and submit HealthCheck and Remedy objects to the Kubernetes server. A HealthCheck / Remedy is essentially an instrumented wrapper around an Argo workflow.
 
-The workflow is run periodically, as defined by `repeatAfterSec` property in its spec, and watched by the Active-Monitor controller.
+The HealthCheck workflow is run periodically, as defined by `repeatAfterSec` or a  `schedule: cron` property in its spec, and watched by the Active-Monitor controller.
 
-Active-Monitor sets the status of the HealthCheck CR to indicate whether the monitoring check succeeded or failed. External systems can query these CRs and take appropriate action if they failed.
+Active-Monitor sets the status of the HealthCheck CR to indicate whether the monitoring check succeeded or failed. If in case the monitoring check failed then the Remedy object will execute the Remedy to fix the issue. Status of Remedy will be updated in the CR.
+External systems can query these CRs and take appropriate action if they failed.
 
 Typical examples of such workflows include tests for basic Kubernetes object creation/deletion, tests for cluster-wide services such as policy engines checks, authentication and authorization checks, etc.
 
@@ -29,6 +30,9 @@ The sort of HealthChecks one could run with Active-Monitor are:
 - verify kube-dns by running DNS lookups on the network
 - verify kube-dns by running DNS lookups on localhost
 - verify KIAM agent by running aws sts get-caller-identity on all available nodes
+- verify if pod max threads has reached
+- verify if storage volume for a pod (e.g: prometheus) has reached its capacity.
+- verify if critical pods e.g: calico, kube-dns/core-dns pods are in a failed or crashloopbackoff state
 
 With the Cluster/Namespace level, healthchecks can be run in any namespace provided namespace is already created.
 The `level` in the `HealthCheck` spec defines at which level it runs; it can be either `Namespace` or `Cluster`.
