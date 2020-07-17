@@ -52,6 +52,7 @@ const (
 	failStr                   = "Failed"
 	defaultWorkflowTTLSec     = 1800
 	remedy                    = "remedy"
+	healthcheck				  = "healthCheck"
 	healthCheckClusterLevel   = "cluster"
 	healthCheckNamespaceLevel = "namespace"
 )
@@ -475,10 +476,10 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 				hc.Status.SuccessCount++
 				hc.Status.Total = hc.Status.SuccessCount + hc.Status.FailedCount
 				hc.Status.LastSuccessfulWorkflow = wfName
-				metrics.MonitorSuccess.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": "healthcheck"}).Inc()
-				metrics.MonitorRuntime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": "healthcheck"}).Set(now.Time.Sub(then.Time).Seconds())
-				metrics.MonitorStartedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": "healthcheck"}).Set(float64(then.Unix()))
-				metrics.MonitorFinishedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": "healthcheck"}).Set(float64(hc.Status.FinishedAt.Unix()))
+				metrics.MonitorSuccess.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": healthcheck}).Inc()
+				metrics.MonitorRuntime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": healthcheck}).Set(now.Time.Sub(then.Time).Seconds())
+				metrics.MonitorStartedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": healthcheck}).Set(float64(then.Unix()))
+				metrics.MonitorFinishedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": healthcheck}).Set(float64(hc.Status.FinishedAt.Unix()))
 				break
 			} else if status["phase"] == failStr {
 				hc.Status.Status = failStr
@@ -489,9 +490,9 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 				hc.Status.FailedCount++
 				hc.Status.Total = hc.Status.SuccessCount + hc.Status.FailedCount
 				hc.Status.LastFailedWorkflow = wfName
-				metrics.MonitorError.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": "healthcheck"}).Inc()
-				metrics.MonitorStartedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": "healthcheck"}).Set(float64(then.Unix()))
-				metrics.MonitorFinishedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": "healthcheck"}).Set(float64(now.Time.Unix()))
+				metrics.MonitorError.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": healthcheck}).Inc()
+				metrics.MonitorStartedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": healthcheck}).Set(float64(then.Unix()))
+				metrics.MonitorFinishedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": healthcheck}).Set(float64(now.Time.Unix()))
 				if !hc.Spec.RemedyWorkflow.IsEmpty() {
 					err := r.processRemedyWorkflow(ctx, log, wfNamespace, hc)
 					if err != nil {
