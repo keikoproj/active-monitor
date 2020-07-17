@@ -53,7 +53,7 @@ const (
 	defaultWorkflowTTLSec     = 1800
 	remedy                    = "remedy"
 	healthCheckClusterLevel   = "cluster"
-	healthCheckNamespaceLevel = "cluster"
+	healthCheckNamespaceLevel = "namespace"
 )
 
 var (
