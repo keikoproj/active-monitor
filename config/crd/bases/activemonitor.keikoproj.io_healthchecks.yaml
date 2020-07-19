@@ -18,6 +18,12 @@ spec:
   - JSONPath: .status.failedCount
     name: FAIL CNT
     type: string
+  - JSONPath: .status.remedySuccessCount
+    name: 'REMEDY SUCCESS CNT  '
+    type: string
+  - JSONPath: .status.remedyFailedCount
+    name: REMEDY FAIL CNT
+    type: string
   - JSONPath: .metadata.creationTimestamp
     name: Age
     type: date
@@ -195,15 +201,8 @@ spec:
               type: string
             successCount:
               type: integer
-            total:
+            totalHealthCheckRuns:
               type: integer
-          required:
-          - failedCount
-          - remedyFailedCount
-          - remedySuccessCount
-          - remedyTotalRuns
-          - successCount
-          - total
           type: object
       type: object
   version: v1alpha1

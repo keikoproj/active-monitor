@@ -52,7 +52,7 @@ const (
 	failStr                   = "Failed"
 	defaultWorkflowTTLSec     = 1800
 	remedy                    = "remedy"
-	healthcheck				  = "healthCheck"
+	healthcheck               = "healthCheck"
 	healthCheckClusterLevel   = "cluster"
 	healthCheckNamespaceLevel = "namespace"
 )
@@ -94,7 +94,6 @@ func ignoreNotFound(err error) error {
 func (r *HealthCheckReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 	log := r.Log.WithValues(hcKind, req.NamespacedName)
-
 	log.Info("Starting HealthCheck reconcile for ...")
 
 	// initialize timers map if not already done
@@ -474,7 +473,7 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 				log.Info("Time:", "hc.Status.StartedAt:", hc.Status.StartedAt)
 				log.Info("Time:", "hc.Status.FinishedAt:", hc.Status.FinishedAt)
 				hc.Status.SuccessCount++
-				hc.Status.Total = hc.Status.SuccessCount + hc.Status.FailedCount
+				hc.Status.TotalHealthCheckRuns = hc.Status.SuccessCount + hc.Status.FailedCount
 				hc.Status.LastSuccessfulWorkflow = wfName
 				metrics.MonitorSuccess.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": healthcheck}).Inc()
 				metrics.MonitorRuntime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": healthcheck}).Set(now.Time.Sub(then.Time).Seconds())
@@ -488,7 +487,7 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 				hc.Status.LastFailedAt = &now
 				hc.Status.ErrorMessage = status["message"].(string)
 				hc.Status.FailedCount++
-				hc.Status.Total = hc.Status.SuccessCount + hc.Status.FailedCount
+				hc.Status.TotalHealthCheckRuns = hc.Status.SuccessCount + hc.Status.FailedCount
 				hc.Status.LastFailedWorkflow = wfName
 				metrics.MonitorError.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": healthcheck}).Inc()
 				metrics.MonitorStartedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": healthcheck}).Set(float64(then.Unix()))
@@ -506,19 +505,10 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 		// if not breaking out due to a terminal state, sleep and check again shortly
 		time.Sleep(time.Second)
 	}
+
 	// since the workflow has taken an unknown duration of time to complete, it's possible that its parent
 	// healthcheck may no longer exist; ensure that it still does before attempting to update it and reschedule
 	// see: https://book.kubebuilder.io/reference/using-finalizers.html
-	if err := r.Get(ctx, req.NamespacedName, hc); err != nil {
-		log.Info("Healthcheck object not found, likely deleted")
-		// stop timer corresponding to next schedule run of workflow since parent healthcheck no longer exists
-		if r.RepeatTimersByName[req.NamespacedName.Name] != nil {
-			log.Info("Cancelling rescheduled workflow for this healthcheck due to deletion")
-			r.RepeatTimersByName[req.NamespacedName.Name].Stop()
-		}
-		return errors.New("healthcheck object not found, likely deleted")
-	}
-
 	if hc.ObjectMeta.DeletionTimestamp.IsZero() {
 		// since the underlying workflow has completed, we update the healthcheck accordingly
 		err := r.Update(ctx, hc)
@@ -611,18 +601,6 @@ func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctr
 	// since the workflow has taken an unknown duration of time to complete, it's possible that its parent
 	// healthcheck may no longer exist; ensure that it still does before attempting to update it and reschedule
 	// see: https://book.kubebuilder.io/reference/using-finalizers.html
-	if err := r.Get(ctx, req.NamespacedName, hc); err != nil {
-		// if our healthcheck was deleted, this Reconcile method is invoked with an empty resource cache
-		// see: https://book.kubebuilder.io/cronjob-tutorial/controller-implementation.html#1-load-the-cronjob-by-name
-		log.Info("Healthcheck object not found for reconciliation, likely deleted")
-		// stop timer corresponding to next schedule run of workflow since parent healthcheck no longer exists
-		if r.RepeatTimersByName[req.NamespacedName.Name] != nil {
-			log.Info("Cancelling rescheduled workflow for this healthcheck due to deletion")
-			r.RepeatTimersByName[req.NamespacedName.Name].Stop()
-		}
-		return errors.New("healthcheck object not found for reconciliation, likely deleted")
-	}
-
 	if hc.ObjectMeta.DeletionTimestamp.IsZero() {
 		// since the underlying workflow has completed, we update the healthcheck accordingly
 		err := r.Update(ctx, hc)

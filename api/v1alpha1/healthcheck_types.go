@@ -48,12 +48,12 @@ type HealthCheckStatus struct {
 	RemedyLastFailedAt     *metav1.Time `json:"remedyLastFailedAt,omitempty"`
 	LastFailedWorkflow     string       `json:"lastFailedWorkflow,omitempty"`
 	LastSuccessfulWorkflow string       `json:"lastSuccessfulWorkflow,omitempty"`
-	SuccessCount           int          `json:"successCount"`
-	FailedCount            int          `json:"failedCount"`
-	RemedySuccessCount     int          `json:"remedySuccessCount"`
-	RemedyFailedCount      int          `json:"remedyFailedCount"`
-	RemedyTotalRuns        int          `json:"remedyTotalRuns"`
-	Total                  int          `json:"total"`
+	SuccessCount           int          `json:"successCount,omitempty"`
+	FailedCount            int          `json:"failedCount,omitempty"`
+	RemedySuccessCount     int          `json:"remedySuccessCount,omitempty"`
+	RemedyFailedCount      int          `json:"remedyFailedCount,omitempty"`
+	RemedyTotalRuns        int          `json:"remedyTotalRuns,omitempty"`
+	TotalHealthCheckRuns   int          `json:"totalHealthCheckRuns,omitempty"`
 	Status                 string       `json:"status,omitempty"`
 	RemedyStatus           string       `json:"remedyStatus,omitempty"`
 }
@@ -63,6 +63,8 @@ type HealthCheckStatus struct {
 // +kubebuilder:printcolumn:name="LATEST STATUS",type=string,JSONPath=`.status.status`
 // +kubebuilder:printcolumn:name="SUCCESS CNT  ",type=string,JSONPath=`.status.successCount`
 // +kubebuilder:printcolumn:name="FAIL CNT",type=string,JSONPath=`.status.failedCount`
+// +kubebuilder:printcolumn:name="REMEDY SUCCESS CNT  ",type=string,JSONPath=`.status.remedySuccessCount`
+// +kubebuilder:printcolumn:name="REMEDY FAIL CNT",type=string,JSONPath=`.status.remedyFailedCount`
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // HealthCheck is the Schema for the healthchecks API
