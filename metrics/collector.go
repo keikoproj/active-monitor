@@ -11,6 +11,7 @@ import (
 )
 
 var hcName = "healthcheck_name"
+var wf = "workflow"
 
 // MonitorProcessed will be used to track the number of processed events
 var (
@@ -18,31 +19,31 @@ var (
 		Name: "healthcheck_success_count",
 		Help: "The total number of successful healthcheck resources",
 	},
-		[]string{hcName},
+		[]string{hcName, wf},
 	)
 	MonitorError = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "healthcheck_error_count",
 		Help: "The total number of errored healthcheck resources",
 	},
-		[]string{hcName},
+		[]string{hcName, wf},
 	)
 	MonitorRuntime = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "healthcheck_runtime_seconds",
 		Help: "Time taken for the workflow to complete.",
 	},
-		[]string{hcName},
+		[]string{hcName, wf},
 	)
 	MonitorStartedTime = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "healthcheck_starttime",
 		Help: "Time taken for the workflow to complete.",
 	},
-		[]string{hcName},
+		[]string{hcName, wf},
 	)
 	MonitorFinishedTime = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "healthcheck_finishedtime",
 		Help: "Time taken for the workflow to complete.",
 	},
-		[]string{hcName},
+		[]string{hcName, wf},
 	)
 
 	CustomGaugeMetricsMap = make(map[string]*prometheus.GaugeVec)
