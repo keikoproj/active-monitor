@@ -20,6 +20,9 @@ rules:
   - configmaps
   - secrets
   - workflows
+  - serviceaccounts
+  - roles
+  - rolebindings
   verbs:
   - "*"
 ---
@@ -37,6 +40,9 @@ rules:
   - pods
   - events
   - healthchecks
+  - serviceaccounts
+  - clusterroles
+  - clusterrolebindings
   verbs:
   - "*"
 ---
