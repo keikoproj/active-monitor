@@ -15,12 +15,11 @@ Active-Monitor is a Kubernetes custom resource controller which enables deep clu
 While it is not too difficult to know that all entities in a cluster are running individually, it is often quite challenging to know that they can all coordinate with each other as required for successful cluster operation (network connectivity, volume access, etc).
 
 ## Overview
-Active-Monitor will create a new `health` namespace when installed in the cluster. Users can then create and submit HealthCheck and Remedy objects to the Kubernetes server. A HealthCheck / Remedy is essentially an instrumented wrapper around an Argo workflow.
+Active-Monitor will create a new `health` namespace when installed in the cluster. Users can then create and submit HealthCheck object to the Kubernetes server. A HealthCheck / Remedy is essentially an instrumented wrapper around an Argo workflow.
 
 The HealthCheck workflow is run periodically, as defined by `repeatAfterSec` or a  `schedule: cron` property in its spec, and watched by the Active-Monitor controller.
 
-Active-Monitor sets the status of the HealthCheck CR to indicate whether the monitoring check succeeded or failed. If in case the monitoring check failed then the Remedy object will execute the Remedy to fix the issue. Status of Remedy will be updated in the CR.
-External systems can query these CRs and take appropriate action if they failed.
+Active-Monitor sets the status of the HealthCheck CR to indicate whether the monitoring check succeeded or failed. If in case the monitoring check failed then the Remedy workflow will execute to fix the issue. Status of Remedy will be updated in the CR. External systems can query these CRs and take appropriate action if they failed.
 
 Typical examples of such workflows include tests for basic Kubernetes object creation/deletion, tests for cluster-wide services such as policy engines checks, authentication and authorization checks, etc.
 
