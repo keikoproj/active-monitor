@@ -17,6 +17,7 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"reflect"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -27,24 +28,34 @@ import (
 // HealthCheckSpec defines the desired state of HealthCheck
 // Either RepeatAfterSec or Schedule must be defined for the health check to run
 type HealthCheckSpec struct {
-	RepeatAfterSec int          `json:"repeatAfterSec,omitempty"`
-	Description    string       `json:"description,omitempty"`
-	Workflow       Workflow     `json:"workflow"`
-	Level          string       `json:"level,omitempty"`    // defines if a workflow runs in a Namespace or Cluster level
-	Schedule       ScheduleSpec `json:"schedule,omitempty"` // Schedule defines schedule rules to run HealthCheck
+	RepeatAfterSec int            `json:"repeatAfterSec,omitempty"`
+	Description    string         `json:"description,omitempty"`
+	Workflow       Workflow       `json:"workflow"`
+	Level          string         `json:"level,omitempty"`    // defines if a workflow runs in a Namespace or Cluster level
+	Schedule       ScheduleSpec   `json:"schedule,omitempty"` // Schedule defines schedule rules to run HealthCheck
+	RemedyWorkflow RemedyWorkflow `json:"remedyworkflow,omitempty"`
 }
 
 // HealthCheckStatus defines the observed state of HealthCheck
 type HealthCheckStatus struct {
 	ErrorMessage           string       `json:"errorMessage,omitempty"`
+	RemedyErrorMessage     string       `json:"remedyErrorMessage,omitempty"`
 	StartedAt              *metav1.Time `json:"startedAt,omitempty"`
 	FinishedAt             *metav1.Time `json:"finishedAt,omitempty"`
 	LastFailedAt           *metav1.Time `json:"lastFailedAt,omitempty"`
+	RemedyStartedAt        *metav1.Time `json:"remedyTriggeredAt,omitempty"`
+	RemedyFinishedAt       *metav1.Time `json:"remedyFinishedAt,omitempty"`
+	RemedyLastFailedAt     *metav1.Time `json:"remedyLastFailedAt,omitempty"`
 	LastFailedWorkflow     string       `json:"lastFailedWorkflow,omitempty"`
 	LastSuccessfulWorkflow string       `json:"lastSuccessfulWorkflow,omitempty"`
-	SuccessCount           int          `json:"successCount"`
-	FailedCount            int          `json:"failedCount"`
+	SuccessCount           int          `json:"successCount,omitempty"`
+	FailedCount            int          `json:"failedCount,omitempty"`
+	RemedySuccessCount     int          `json:"remedySuccessCount,omitempty"`
+	RemedyFailedCount      int          `json:"remedyFailedCount,omitempty"`
+	RemedyTotalRuns        int          `json:"remedyTotalRuns,omitempty"`
+	TotalHealthCheckRuns   int          `json:"totalHealthCheckRuns,omitempty"`
 	Status                 string       `json:"status,omitempty"`
+	RemedyStatus           string       `json:"remedyStatus,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -52,6 +63,8 @@ type HealthCheckStatus struct {
 // +kubebuilder:printcolumn:name="LATEST STATUS",type=string,JSONPath=`.status.status`
 // +kubebuilder:printcolumn:name="SUCCESS CNT  ",type=string,JSONPath=`.status.successCount`
 // +kubebuilder:printcolumn:name="FAIL CNT",type=string,JSONPath=`.status.failedCount`
+// +kubebuilder:printcolumn:name="REMEDY SUCCESS CNT  ",type=string,JSONPath=`.status.remedySuccessCount`
+// +kubebuilder:printcolumn:name="REMEDY FAIL CNT",type=string,JSONPath=`.status.remedyFailedCount`
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // HealthCheck is the Schema for the healthchecks API
@@ -70,6 +83,16 @@ type HealthCheckList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []HealthCheck `json:"items"`
+}
+
+// Workflow struct describes a Remedy workflow
+type RemedyWorkflow struct {
+	GenerateName string          `json:"generateName,omitempty"`
+	Resource     *ResourceObject `json:"resource,omitempty"`
+}
+
+func (w RemedyWorkflow) IsEmpty() bool {
+	return reflect.DeepEqual(w, RemedyWorkflow{})
 }
 
 // Workflow struct describes an Argo workflow
