@@ -11,31 +11,31 @@ rules:
   resources:
   - healthchecks
   verbs:
-  - create
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
+  - create
+  - update
+  - patch
+  - delete
 - apiGroups:
   - activemonitor.keikoproj.io
   resources:
   - healthchecks/status
   verbs:
   - get
-  - patch
   - update
+  - patch
 - apiGroups:
   - argoproj.io
   resources:
   - workflow
   - workflows
   verbs:
-  - create
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
+  - create
+  - update
+  - patch
+  - delete
