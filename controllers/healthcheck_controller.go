@@ -55,6 +55,8 @@ const (
 	healthcheck               = "healthCheck"
 	healthCheckClusterLevel   = "cluster"
 	healthCheckNamespaceLevel = "namespace"
+	WfInstanceIdLabelKey      = "workflows.argoproj.io/controller-instanceid"
+	WfInstanceId              = "activemonitor-workflows"
 )
 
 var (
@@ -77,6 +79,7 @@ type HealthCheckReconciler struct {
 	kubeclient         *kubernetes.Clientset
 	Log                logr.Logger
 	RepeatTimersByName map[string]*time.Timer
+	workflowLabels     map[string]string
 }
 
 func ignoreNotFound(err error) error {
@@ -395,6 +398,7 @@ func (r *HealthCheckReconciler) createSubmitWorkflow(ctx context.Context, log lo
 	workflow.SetGroupVersionKind(wfGvk)
 	workflow.SetNamespace(hc.Spec.Workflow.Resource.Namespace)
 	workflow.SetGenerateName(hc.Spec.Workflow.GenerateName)
+	workflow.SetLabels(r.workflowLabels)
 	// set the owner references for workflow
 	ownerReferences := workflow.GetOwnerReferences()
 	trueVar := true
@@ -631,6 +635,22 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 	if err := yaml.Unmarshal(wfContent, &data); err != nil {
 		log.Error(err, "Invalid spec file passed")
 		return err
+	}
+	// parse workflow labels
+	wflabels := data["metadata"].(map[string]interface{})["labels"]
+
+	if r.workflowLabels == nil {
+		r.workflowLabels = make(map[string]string)
+	}
+
+	//instanceId labels to workflows
+	if wflabels == nil {
+		r.workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
+	} else {
+		for k, v := range wflabels.(map[string]interface{}) {
+			strValue := fmt.Sprintf("%v", v)
+			r.workflowLabels[k] = strValue
+		}
 	}
 	content := uwf.UnstructuredContent()
 	// make sure workflows by default get cleaned up
