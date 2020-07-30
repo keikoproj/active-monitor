@@ -149,7 +149,7 @@ metadata:
   namespace: health
 data:
   config: |
-    instanceID: keiko-workflows
+    instanceID: activemonitor-workflows
     namespace: health
 ---
 apiVersion: apps/v1beta2
