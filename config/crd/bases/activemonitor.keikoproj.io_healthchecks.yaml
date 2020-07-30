@@ -203,9 +203,6 @@ spec:
               type: integer
             totalHealthCheckRuns:
               type: integer
-          required:
-          - failedCount
-          - successCount
           type: object
       type: object
   version: v1alpha1
