@@ -48,8 +48,8 @@ type HealthCheckStatus struct {
 	RemedyLastFailedAt     *metav1.Time `json:"remedyLastFailedAt,omitempty"`
 	LastFailedWorkflow     string       `json:"lastFailedWorkflow,omitempty"`
 	LastSuccessfulWorkflow string       `json:"lastSuccessfulWorkflow,omitempty"`
-	SuccessCount           int          `json:"successCount"`
-	FailedCount            int          `json:"failedCount"`
+	SuccessCount           int          `json:"successCount,omitempty"`
+	FailedCount            int          `json:"failedCount,omitempty"`
 	RemedySuccessCount     int          `json:"remedySuccessCount,omitempty"`
 	RemedyFailedCount      int          `json:"remedyFailedCount,omitempty"`
 	RemedyTotalRuns        int          `json:"remedyTotalRuns,omitempty"`
