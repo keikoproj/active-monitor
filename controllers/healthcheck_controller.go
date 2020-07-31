@@ -624,7 +624,6 @@ func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctr
 func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc *activemonitorv1alpha1.HealthCheck, uwf *unstructured.Unstructured) error {
 	var wfContent []byte
 	var data map[string]interface{}
-	//var label map[string]interface{}
 	if hc.Spec.Workflow.Resource != nil {
 		reader, err := store.GetArtifactReader(&hc.Spec.Workflow.Resource.Source)
 		if err != nil {
