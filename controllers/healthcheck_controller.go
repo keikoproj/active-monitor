@@ -680,12 +680,9 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 		//assign instanceId labels to workflows
 		r.workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
 		m1 := metadata{generateName: hc.Spec.Workflow.GenerateName, labels: r.workflowLabels}
-
-		// parse workflow labels
 		data["metadata"] = m1
-
 		log.Info("Workflow Labels are set:", "wflabel:", r.workflowLabels)
-		log.Info("metadata for Workflow is updated", "metadata:", m1)
+		log.Info("metadata for Workflow is updated", "metadata generateName:", m1.generateName, "metadata label:", m1.labels)
 	}
 
 	content := uwf.UnstructuredContent()
@@ -773,12 +770,9 @@ func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logg
 		//assign instanceId labels to workflows
 		r.workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
 		m1 := metadata{generateName: hc.Spec.Workflow.GenerateName, labels: r.workflowLabels}
-
-		// parse workflow labels
 		data["metadata"] = m1
-
 		log.Info("Workflow Labels are set:", "wflabel:", r.workflowLabels)
-		log.Info("metadata for Workflow is updated", "metadata:", m1)
+		log.Info("metadata for Workflow is updated", "metadata generateName:", m1.generateName, "metadata label:", m1.labels)
 	}
 
 	content := uwf.UnstructuredContent()
