@@ -685,7 +685,7 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 		data["metadata"] = m1
 
 		log.Info("Workflow Labels are set:", "wflabel:", r.workflowLabels)
-		log.Info("metadata for Workflow is updated", "metada:", m1)
+		log.Info("metadata for Workflow is updated", "metadata:", m1)
 	}
 
 	content := uwf.UnstructuredContent()
@@ -778,7 +778,7 @@ func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logg
 		data["metadata"] = m1
 
 		log.Info("Workflow Labels are set:", "wflabel:", r.workflowLabels)
-		log.Info("metadata for Workflow is updated", "metada:", m1)
+		log.Info("metadata for Workflow is updated", "metadata:", m1)
 	}
 
 	content := uwf.UnstructuredContent()
