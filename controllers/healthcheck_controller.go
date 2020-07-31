@@ -667,6 +667,25 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 			}
 		}
 		log.Info("Workflow Labels set are:", "wflabel:", r.workflowLabels)
+	} else {
+		log.Info("metadata for workflow is not set")
+		type metadata struct {
+			generateName string
+			labels       map[string]string
+		}
+		if r.workflowLabels == nil {
+			r.workflowLabels = make(map[string]string)
+		}
+
+		//assign instanceId labels to workflows
+		r.workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
+		m1 := metadata{generateName: hc.Spec.Workflow.GenerateName, labels: r.workflowLabels}
+
+		// parse workflow labels
+		data["metadata"] = m1
+
+		log.Info("Workflow Labels are set:", "wflabel:", r.workflowLabels)
+		log.Info("metadata for Workflow is updated", "metada:", m1)
 	}
 
 	content := uwf.UnstructuredContent()
@@ -741,6 +760,25 @@ func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logg
 			}
 		}
 		log.Info("Workflow Labels set are:", "wflabel:", r.workflowLabels)
+	} else {
+		log.Info("metadata for workflow is not set")
+		type metadata struct {
+			generateName string
+			labels       map[string]string
+		}
+		if r.workflowLabels == nil {
+			r.workflowLabels = make(map[string]string)
+		}
+
+		//assign instanceId labels to workflows
+		r.workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
+		m1 := metadata{generateName: hc.Spec.Workflow.GenerateName, labels: r.workflowLabels}
+
+		// parse workflow labels
+		data["metadata"] = m1
+
+		log.Info("Workflow Labels are set:", "wflabel:", r.workflowLabels)
+		log.Info("metadata for Workflow is updated", "metada:", m1)
 	}
 
 	content := uwf.UnstructuredContent()
