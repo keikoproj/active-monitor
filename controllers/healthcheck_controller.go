@@ -624,6 +624,7 @@ func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctr
 func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc *activemonitorv1alpha1.HealthCheck, uwf *unstructured.Unstructured) error {
 	var wfContent []byte
 	var data map[string]interface{}
+	//var label map[string]interface{}
 	if hc.Spec.Workflow.Resource != nil {
 		reader, err := store.GetArtifactReader(&hc.Spec.Workflow.Resource.Source)
 		if err != nil {
@@ -641,22 +642,33 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 		log.Error(err, "Invalid spec file passed")
 		return err
 	}
-	// parse workflow labels
-	wflabels := data["metadata"].(map[string]interface{})["labels"]
 
-	if r.workflowLabels == nil {
-		r.workflowLabels = make(map[string]string)
-	}
-
-	//instanceId labels to workflows
-	if wflabels == nil {
-		r.workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
-	} else {
-		for k, v := range wflabels.(map[string]interface{}) {
-			strValue := fmt.Sprintf("%v", v)
-			r.workflowLabels[k] = strValue
+	// check if metadata is set then parse workflow labels
+	log.Info("workflow metadata is", "metadata:", data["metadata"])
+	if data["metadata"] != nil {
+		log.Info("metadata workflow labels are", "workflowlabels:", data["metadata"].(map[string]interface{})["labels"])
+		// parse workflow labels
+		wflabels, tr := data["metadata"].(map[string]interface{})["labels"]
+		if !tr {
+			log.Info("Workflow Labels are not set. ")
 		}
+
+		if r.workflowLabels == nil {
+			r.workflowLabels = make(map[string]string)
+		}
+
+		//assign instanceId labels to workflows
+		if wflabels == nil {
+			r.workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
+		} else {
+			for k, v := range wflabels.(map[string]interface{}) {
+				strValue := fmt.Sprintf("%v", v)
+				r.workflowLabels[k] = strValue
+			}
+		}
+		log.Info("Workflow Labels set are:", "wflabel:", r.workflowLabels)
 	}
+
 	content := uwf.UnstructuredContent()
 	// make sure workflows by default get cleaned up
 	if ttlSecondAfterFinished := data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"]; ttlSecondAfterFinished == nil {
@@ -705,21 +717,30 @@ func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logg
 		return err
 	}
 
-	// parse workflow labels
-	wflabels := data["metadata"].(map[string]interface{})["labels"]
-
-	if r.workflowLabels == nil {
-		r.workflowLabels = make(map[string]string)
-	}
-
-	//instanceId labels to workflows
-	if wflabels == nil {
-		r.workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
-	} else {
-		for k, v := range wflabels.(map[string]interface{}) {
-			strValue := fmt.Sprintf("%v", v)
-			r.workflowLabels[k] = strValue
+	// check if metadata is set then parse workflow labels
+	log.Info("workflow metadata is", "metadata:", data["metadata"])
+	if data["metadata"] != nil {
+		log.Info("metadata workflow labels are", "workflowlabels:", data["metadata"].(map[string]interface{})["labels"])
+		// parse workflow labels
+		wflabels, tr := data["metadata"].(map[string]interface{})["labels"]
+		if !tr {
+			log.Info("Workflow Labels are not set. ")
 		}
+
+		if r.workflowLabels == nil {
+			r.workflowLabels = make(map[string]string)
+		}
+
+		//assign instanceId labels to workflows
+		if wflabels == nil {
+			r.workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
+		} else {
+			for k, v := range wflabels.(map[string]interface{}) {
+				strValue := fmt.Sprintf("%v", v)
+				r.workflowLabels[k] = strValue
+			}
+		}
+		log.Info("Workflow Labels set are:", "wflabel:", r.workflowLabels)
 	}
 
 	content := uwf.UnstructuredContent()
