@@ -43,6 +43,9 @@ func init() {
 func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
+	var maxParallel int
+
+	flag.IntVar(&maxParallel, "max-workers", 10, "The number of maximum parallel reconciles")
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
@@ -65,9 +68,10 @@ func main() {
 		setupLog.Error(err, "unable to get dynamic client")
 	}
 	err = (&controllers.HealthCheckReconciler{
-		Client:    mgr.GetClient(),
-		DynClient: dynClient,
-		Log:       ctrl.Log.WithName("controllers").WithName("HealthCheck"),
+		Client:      mgr.GetClient(),
+		DynClient:   dynClient,
+		Log:         ctrl.Log.WithName("controllers").WithName("HealthCheck"),
+		MaxParallel: maxParallel,
 	}).SetupWithManager(mgr)
 	if err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "HealthCheck")
