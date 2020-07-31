@@ -228,12 +228,6 @@ subjects:
   namespace: health
 ---
 apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: workflow-controller-configmap
-  namespace: health
----
-apiVersion: v1
 kind: Service
 metadata:
   name: argo-ui
