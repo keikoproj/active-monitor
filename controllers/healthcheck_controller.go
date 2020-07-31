@@ -19,6 +19,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"time"
 
 	"github.com/ghodss/yaml"
@@ -78,6 +79,7 @@ type HealthCheckReconciler struct {
 	DynClient          dynamic.Interface
 	kubeclient         *kubernetes.Clientset
 	Log                logr.Logger
+	MaxParallel        int
 	RepeatTimersByName map[string]*time.Timer
 	workflowLabels     map[string]string
 }
@@ -200,6 +202,7 @@ func (r *HealthCheckReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.kubeclient = kubernetes.NewForConfigOrDie(mgr.GetConfig())
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&activemonitorv1alpha1.HealthCheck{}).
+		WithOptions(controller.Options{MaxConcurrentReconciles: r.MaxParallel}).
 		Complete(r)
 }
 
