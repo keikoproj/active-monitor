@@ -110,10 +110,10 @@ func (r *HealthCheckReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 	if err := r.Get(ctx, req.NamespacedName, healthCheck); err != nil {
 		// if our healthcheck was deleted, this Reconcile method is invoked with an empty resource cache
 		// see: https://book.kubebuilder.io/cronjob-tutorial/controller-implementation.html#1-load-the-cronjob-by-name
-		log.Info("Healthcheck object not found for reconciliation, likely deleted", "deleted", "deleted")
+		log.Info("Healthcheck object not found for reconciliation, likely deleted")
 		// stop timer corresponding to next schedule run of workflow since parent healthcheck no longer exists
 		if r.RepeatTimersByName[req.NamespacedName.Name] != nil {
-			log.Info("Cancelling rescheduled workflow for this healthcheck due to deletion", "deleted", "deleted")
+			log.Info("Cancelling rescheduled workflow for this healthcheck due to deletion")
 			r.RepeatTimersByName[req.NamespacedName.Name].Stop()
 		}
 		return ctrl.Result{}, ignoreNotFound(err)
