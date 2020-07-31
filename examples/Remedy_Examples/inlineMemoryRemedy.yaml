@@ -28,7 +28,7 @@ spec:
                 container: 
                   image: ravihari/ctrmemory:v2
                   command: ["python"]
-                  args: ["promanalysis.py", "http://prometheus.iks-system.svc.cluster.local:9090", "health", "memory-demo", "memory-demo-ctr", "95"]
+                  args: ["promanalysis.py", "http://prometheus.system.svc.cluster.local:9090", "health", "memory-demo", "memory-demo-ctr", "95"]
   remedyworkflow:
     generateName: remedy-test-
     resource:
