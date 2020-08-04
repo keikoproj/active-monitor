@@ -15,7 +15,7 @@ Bleeding-edge development, not yet released
 - Workflow creation ignores metadata information in the healthcheck spec - #55
 - Active-Monitor to process multiple custom resources in parallel - #54
 ### Updated
-- Controller-gen and kube-builder updates. - #47
+- Update Controller-gen to v0.2.4 and kube-builder to v2.3.0. - #47
 
 ## [0.3.0] - 2020-02-24
 ### Added
