@@ -19,6 +19,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"time"
 
 	"github.com/ghodss/yaml"
@@ -55,6 +56,8 @@ const (
 	healthcheck               = "healthCheck"
 	healthCheckClusterLevel   = "cluster"
 	healthCheckNamespaceLevel = "namespace"
+	WfInstanceIdLabelKey      = "workflows.argoproj.io/controller-instanceid"
+	WfInstanceId              = "activemonitor-workflows"
 )
 
 var (
@@ -76,7 +79,9 @@ type HealthCheckReconciler struct {
 	DynClient          dynamic.Interface
 	kubeclient         *kubernetes.Clientset
 	Log                logr.Logger
+	MaxParallel        int
 	RepeatTimersByName map[string]*time.Timer
+	workflowLabels     map[string]string
 }
 
 func ignoreNotFound(err error) error {
@@ -197,6 +202,7 @@ func (r *HealthCheckReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.kubeclient = kubernetes.NewForConfigOrDie(mgr.GetConfig())
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&activemonitorv1alpha1.HealthCheck{}).
+		WithOptions(controller.Options{MaxConcurrentReconciles: r.MaxParallel}).
 		Complete(r)
 }
 
@@ -395,6 +401,7 @@ func (r *HealthCheckReconciler) createSubmitWorkflow(ctx context.Context, log lo
 	workflow.SetGroupVersionKind(wfGvk)
 	workflow.SetNamespace(hc.Spec.Workflow.Resource.Namespace)
 	workflow.SetGenerateName(hc.Spec.Workflow.GenerateName)
+	workflow.SetLabels(r.workflowLabels)
 	// set the owner references for workflow
 	ownerReferences := workflow.GetOwnerReferences()
 	trueVar := true
@@ -425,6 +432,8 @@ func (r *HealthCheckReconciler) createSubmitRemedyWorkflow(ctx context.Context, 
 	remedyWorkflow.SetGroupVersionKind(wfGvk)
 	remedyWorkflow.SetNamespace(hc.Spec.RemedyWorkflow.Resource.Namespace)
 	remedyWorkflow.SetGenerateName(hc.Spec.RemedyWorkflow.GenerateName)
+	remedyWorkflow.SetLabels(r.workflowLabels)
+
 	// set the owner references for workflow
 	ownerReferences := remedyWorkflow.GetOwnerReferences()
 	trueVar := true
@@ -632,6 +641,49 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 		log.Error(err, "Invalid spec file passed")
 		return err
 	}
+
+	// check if metadata is set then parse workflow labels
+	log.Info("workflow metadata is", "metadata:", data["metadata"])
+	if data["metadata"] != nil {
+		log.Info("metadata workflow labels are", "workflowlabels:", data["metadata"].(map[string]interface{})["labels"])
+		// parse workflow labels
+		wflabels, tr := data["metadata"].(map[string]interface{})["labels"]
+		if !tr {
+			log.Info("Workflow Labels are not set. ")
+		}
+
+		if r.workflowLabels == nil {
+			r.workflowLabels = make(map[string]string)
+		}
+
+		//assign instanceId labels to workflows
+		if wflabels == nil {
+			r.workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
+		} else {
+			for k, v := range wflabels.(map[string]interface{}) {
+				strValue := fmt.Sprintf("%v", v)
+				r.workflowLabels[k] = strValue
+			}
+		}
+		log.Info("Workflow Labels set are:", "wflabel:", r.workflowLabels)
+	} else {
+		log.Info("metadata for workflow is not set")
+		type metadata struct {
+			generateName string
+			labels       map[string]string
+		}
+		if r.workflowLabels == nil {
+			r.workflowLabels = make(map[string]string)
+		}
+
+		//assign instanceId labels to workflows
+		r.workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
+		m1 := metadata{generateName: hc.Spec.Workflow.GenerateName, labels: r.workflowLabels}
+		data["metadata"] = m1
+		log.Info("Workflow Labels are set:", "wflabel:", r.workflowLabels)
+		log.Info("metadata for Workflow is updated", "metadata generateName:", m1.generateName, "metadata label:", m1.labels)
+	}
+
 	content := uwf.UnstructuredContent()
 	// make sure workflows by default get cleaned up
 	if ttlSecondAfterFinished := data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"]; ttlSecondAfterFinished == nil {
@@ -679,6 +731,49 @@ func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logg
 		log.Error(err, "Invalid spec file passed")
 		return err
 	}
+
+	// check if metadata is set then parse workflow labels
+	log.Info("workflow metadata is", "metadata:", data["metadata"])
+	if data["metadata"] != nil {
+		log.Info("metadata workflow labels are", "workflowlabels:", data["metadata"].(map[string]interface{})["labels"])
+		// parse workflow labels
+		wflabels, tr := data["metadata"].(map[string]interface{})["labels"]
+		if !tr {
+			log.Info("Workflow Labels are not set. ")
+		}
+
+		if r.workflowLabels == nil {
+			r.workflowLabels = make(map[string]string)
+		}
+
+		//assign instanceId labels to workflows
+		if wflabels == nil {
+			r.workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
+		} else {
+			for k, v := range wflabels.(map[string]interface{}) {
+				strValue := fmt.Sprintf("%v", v)
+				r.workflowLabels[k] = strValue
+			}
+		}
+		log.Info("Workflow Labels set are:", "wflabel:", r.workflowLabels)
+	} else {
+		log.Info("metadata for workflow is not set")
+		type metadata struct {
+			generateName string
+			labels       map[string]string
+		}
+		if r.workflowLabels == nil {
+			r.workflowLabels = make(map[string]string)
+		}
+
+		//assign instanceId labels to workflows
+		r.workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
+		m1 := metadata{generateName: hc.Spec.Workflow.GenerateName, labels: r.workflowLabels}
+		data["metadata"] = m1
+		log.Info("Workflow Labels are set:", "wflabel:", r.workflowLabels)
+		log.Info("metadata for Workflow is updated", "metadata generateName:", m1.generateName, "metadata label:", m1.labels)
+	}
+
 	content := uwf.UnstructuredContent()
 	// make sure workflows by default get cleaned up
 	if ttlSecondAfterFinished := data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"]; ttlSecondAfterFinished == nil {
