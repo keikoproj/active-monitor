@@ -152,7 +152,7 @@ data:
     instanceID: activemonitor-workflows
     namespace: health
 ---
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: workflow-controller
@@ -239,7 +239,7 @@ spec:
   selector:
     app: argo-ui
 ---
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: argo-ui
