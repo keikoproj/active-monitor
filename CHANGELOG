@@ -12,10 +12,11 @@ Bleeding-edge development, not yet released
 - Consolidate Metric Endpoints for Active-Monitor - #7
 - Update Status fields to include Total Healthcheck count - #49
 - Update healthcheck spec and controller to support automatic "remediation" - #23
-- Workflow creation ignores metadata information in the healthcheck spec - #55
 - Active-Monitor to process multiple custom resources in parallel - #54
 ### Updated
 - Update Controller-gen to v0.2.4 and kube-builder to v2.3.0. - #47
+### Fixed
+- Workflow creation ignores metadata information in the healthcheck spec - #55
 
 ## [0.3.0] - 2020-02-24
 ### Added
