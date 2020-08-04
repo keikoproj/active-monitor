@@ -17,6 +17,8 @@ spec:
             apiVersion: argoproj.io/v1alpha1
             kind: Workflow
             metadata:
+              labels:
+                workflows.argoproj.io/controller-instanceid: activemonitor-workflows
               generateName: dns-workflow-
             spec:
               ttlSecondsAfterFinished: 60

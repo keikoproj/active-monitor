@@ -15,6 +15,9 @@ spec:
         inline: |
             apiVersion: argoproj.io/v1alpha1
             kind: Workflow
+            metadata:
+              labels:
+                workflows.argoproj.io/controller-instanceid: activemonitor-workflows
             spec:
               ttlSecondsAfterFinished: 60
               entrypoint: start
