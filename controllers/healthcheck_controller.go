@@ -19,7 +19,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"time"
 
 	"github.com/ghodss/yaml"
@@ -91,12 +93,24 @@ func ignoreNotFound(err error) error {
 	return err
 }
 
+// NewHealthCheckReconciler returns an instance of HealthCheckReconciler
+func NewHealthCheckReconciler(mgr manager.Manager, log logr.Logger, MaxParallel int) *HealthCheckReconciler {
+	return &HealthCheckReconciler{
+		Client:      mgr.GetClient(),
+		DynClient:   dynamic.NewForConfigOrDie(mgr.GetConfig()),
+		kubeclient:  kubernetes.NewForConfigOrDie(mgr.GetConfig()),
+		Log:         log,
+		MaxParallel: MaxParallel,
+	}
+}
+
 // +kubebuilder:rbac:groups=activemonitor.keikoproj.io,resources=healthchecks,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=activemonitor.keikoproj.io,resources=healthchecks/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=argoproj.io,resources=workflow;workflows,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile per kubebuilder v2 pattern
 func (r *HealthCheckReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+	logrus.Info("Calling Reconciler")
 	ctx := context.Background()
 	log := r.Log.WithValues(hcKind, req.NamespacedName)
 	log.Info("Starting HealthCheck reconcile for ...")
