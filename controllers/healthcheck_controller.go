@@ -484,9 +484,8 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 		}
 		status, ok := workflow.UnstructuredContent()["status"].(map[string]interface{})
 		log.Info("status of workflow", "status:", status)
-		if status == nil {
-			var elapsed int
-			elapsed = int(now.Time.Sub(then.Time).Seconds())
+		elapsed := int(now.Time.Sub(then.Time).Seconds())
+		if status == nil && elapsed > hc.Spec.Workflow.Timeout {
 			// if the time elapsed is more than repeatAfterSec the workflow will get a SigTerm as activeDeadlineSeconds
 			// is set as the same value as repeatAfterSec, Also the next iteration of monitor will start
 			if elapsed > repeatAfterSec {
@@ -597,9 +596,8 @@ func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctr
 		}
 		status, ok := workflow.UnstructuredContent()["status"].(map[string]interface{})
 		log.Info("status of workflow", "status:", status)
-		if status == nil {
-			var elapsed int
-			elapsed = int(now.Time.Sub(then.Time).Seconds())
+		elapsed := int(now.Time.Sub(then.Time).Seconds())
+		if status == nil && elapsed > hc.Spec.Workflow.Timeout {
 			// if the time elapsed is more than repeatAfterSec the workflow will get a SigTerm as activeDeadlineSeconds
 			// is set as the same value as repeatAfterSec, Also the next iteration of monitor will start
 			if elapsed > hc.Spec.RepeatAfterSec {
@@ -737,6 +735,9 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 	timeout = int64(hc.Spec.RepeatAfterSec)
 	if activeDeadlineSeconds := data["spec"].(map[string]interface{})["activeDeadlineSeconds"]; activeDeadlineSeconds == nil {
 		data["spec"].(map[string]interface{})["activeDeadlineSeconds"] = &timeout
+		hc.Spec.Workflow.Timeout = int(timeout)
+	} else {
+		hc.Spec.Workflow.Timeout = int(activeDeadlineSeconds.(float64))
 	}
 	spec, ok := data["spec"]
 	if !ok {
@@ -827,7 +828,11 @@ func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logg
 	timeout = int64(hc.Spec.RepeatAfterSec)
 	if activeDeadlineSeconds := data["spec"].(map[string]interface{})["activeDeadlineSeconds"]; activeDeadlineSeconds == nil {
 		data["spec"].(map[string]interface{})["activeDeadlineSeconds"] = &timeout
+		hc.Spec.RemedyWorkflow.Timeout = int(timeout)
+	} else {
+		hc.Spec.RemedyWorkflow.Timeout = int(activeDeadlineSeconds.(float64))
 	}
+
 	spec, ok := data["spec"]
 	if !ok {
 		err := errors.New("Invalid workflow, missing spec")
