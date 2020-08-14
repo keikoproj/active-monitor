@@ -203,11 +203,11 @@ Then visit: [http://127.0.0.1:8001](http://127.0.0.1:8001)
 
 Active-Monitor controller also exports metrics in Prometheus format which can be further used for notifications and alerting.
 
-Prometheus metrics are available on `:2112/metrics`
+Prometheus metrics are available on `:8080/metrics`
 ```
-kubectl -n health port-forward deployment/activemonitor-controller 2112:2112
+kubectl -n health port-forward deployment/activemonitor-controller 8080:8080
 ```
-Then visit: [http://localhost:2112/metrics](http://localhost:2112/metrics)
+Then visit: [http://localhost:8080/metrics](http://localhost:8080/metrics)
 
 Active-Monitor, by default, exports following Promethus metrics:
 

@@ -18,21 +18,24 @@ import (
 
 var (
 	healthCheckNamespace = "health"
-	healthCheckName      = "inline-hello"
+	healthCheckName      = "inline-monitor-remedy"
 	healthCheckKey       = types.NamespacedName{Name: healthCheckName, Namespace: healthCheckNamespace}
+	healthCheckNameNs    = "inline-monitor-remedy-namespace"
+	healthCheckKeyNs     = types.NamespacedName{Name: healthCheckNameNs, Namespace: healthCheckNamespace}
+	healthCheckNamePause = "inline-hello-pause"
+	healthCheckKeyPause  = types.NamespacedName{Name: healthCheckNamePause, Namespace: healthCheckNamespace}
 )
 
-const timeout = time.Second * 30
+const timeout = time.Second * 60
 
 var _ = Describe("Active-Monitor Controller", func() {
 
-	Describe("healthCheck CR can be reconciled", func() {
+	Describe("healthCheck CR can be reconciled at cluster level", func() {
 		var instance *activemonitorv1alpha1.HealthCheck
-
 		It("instance should be parsable", func() {
-			healthCheckYaml, err := ioutil.ReadFile("/Users/rhari/go/src/github.com/RaviHari/active-monitor/examples/inlineHello.yaml")
+			//healthCheckYaml, err := ioutil.ReadFile("../examples/inlineHello.yaml")
+			healthCheckYaml, err := ioutil.ReadFile("../examples/bdd/inlineMemoryRemedyUnitTest.yaml")
 			Expect(err).ToNot(HaveOccurred())
-
 			instance, err = parseHealthCheckYaml(healthCheckYaml)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(instance).To(BeAssignableToTypeOf(&activemonitorv1alpha1.HealthCheck{}))
@@ -54,14 +57,93 @@ var _ = Describe("Active-Monitor Controller", func() {
 					return err
 				}
 
-				if instance.ObjectMeta.DeletionTimestamp.IsZero() {
+				if instance.Status.StartedAt != nil {
 					return nil
 				}
 				return fmt.Errorf("HealthCheck is not valid")
 			}, timeout).Should(Succeed())
 
-			By("Verify healthCheck has been reconciled by checking for checksum status")
-			Expect(instance.Status.ErrorMessage).Should(BeEmpty())
+			By("Verify healthCheck has been reconciled by checking for status")
+			Expect(instance.Status.ErrorMessage).ShouldNot(BeEmpty())
+		})
+	})
+
+	Describe("healthCheck CR can be reconciled at namespace level", func() {
+		var instance *activemonitorv1alpha1.HealthCheck
+
+		It("instance should be parsable", func() {
+			//healthCheckYaml, err := ioutil.ReadFile("../examples/inlineHello.yaml")
+			healthCheckYaml, err := ioutil.ReadFile("../examples/bdd/inlineMemoryRemedyUnitTest_Namespace.yaml")
+			Expect(err).ToNot(HaveOccurred())
+
+			instance, err = parseHealthCheckYaml(healthCheckYaml)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(instance).To(BeAssignableToTypeOf(&activemonitorv1alpha1.HealthCheck{}))
+			Expect(instance.GetName()).To(Equal(healthCheckNameNs))
+		})
+
+		It("instance should be reconciled", func() {
+			instance.SetNamespace(healthCheckNamespace)
+			err := k8sClient.Create(context.TODO(), instance)
+			if apierrors.IsInvalid(err) {
+				log.Error(err, "failed to create object, got an invalid object error")
+				return
+			}
+			Expect(err).NotTo(HaveOccurred())
+			defer k8sClient.Delete(context.TODO(), instance)
+
+			Eventually(func() error {
+				if err := k8sClient.Get(context.TODO(), healthCheckKeyNs, instance); err != nil {
+					return err
+				}
+
+				if instance.Status.StartedAt != nil {
+					return nil
+				}
+				return fmt.Errorf("HealthCheck is not valid")
+			}, timeout).Should(Succeed())
+
+			By("Verify healthCheck has been reconciled by checking for status")
+			Expect(instance.Status.ErrorMessage).ShouldNot(BeEmpty())
+		})
+	})
+
+	Describe("healthCheck CR will be paused with repeatAfterSec set to 0", func() {
+		var instance *activemonitorv1alpha1.HealthCheck
+
+		It("instance should be parsable", func() {
+			healthCheckYaml, err := ioutil.ReadFile("../examples/bdd/inlineHelloTest.yaml")
+			Expect(err).ToNot(HaveOccurred())
+
+			instance, err = parseHealthCheckYaml(healthCheckYaml)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(instance).To(BeAssignableToTypeOf(&activemonitorv1alpha1.HealthCheck{}))
+			Expect(instance.GetName()).To(Equal(healthCheckNamePause))
+		})
+
+		It("instance should be reconciled", func() {
+			instance.SetNamespace(healthCheckNamespace)
+			err := k8sClient.Create(context.TODO(), instance)
+			if apierrors.IsInvalid(err) {
+				log.Error(err, "failed to create object, got an invalid object error")
+				return
+			}
+			Expect(err).NotTo(HaveOccurred())
+			defer k8sClient.Delete(context.TODO(), instance)
+
+			Eventually(func() error {
+				if err := k8sClient.Get(context.TODO(), healthCheckKeyPause, instance); err != nil {
+					return err
+				}
+
+				if instance.Status.Status == "Stopped" {
+					return nil
+				}
+				return fmt.Errorf("HealthCheck is not valid")
+			}, timeout).Should(Succeed())
+
+			By("Verify healthCheck has been reconciled by checking for status")
+			Expect(instance.Status.ErrorMessage).ShouldNot(BeEmpty())
 		})
 	})
 })

@@ -17,6 +17,7 @@ package controllers
 
 import (
 	"github.com/go-logr/logr"
+	"k8s.io/client-go/rest"
 	"path/filepath"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
@@ -30,7 +31,6 @@ import (
 
 	activemonitorv1alpha1 "github.com/keikoproj/active-monitor/api/v1alpha1"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -43,6 +43,7 @@ import (
 var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
+
 var mgr manager.Manager
 var stopMgr chan struct{}
 var wg *sync.WaitGroup
@@ -72,20 +73,15 @@ var _ = BeforeSuite(func(done Done) {
 
 	// +kubebuilder:scaffold:scheme
 
-	//k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
-	//Expect(err).ToNot(HaveOccurred())
-	//Expect(k8sClient).ToNot(BeNil())
-	//
-	//close(done)
 	By("starting reconciler and manager")
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).ToNot(HaveOccurred())
 	Expect(k8sClient).ToNot(BeNil())
 
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme:         scheme.Scheme,
+		Scheme:             scheme.Scheme,
 		MetricsBindAddress: ":8080",
-		LeaderElection: false,
+		LeaderElection:     false,
 	})
 	Expect(err).ToNot(HaveOccurred())
 	Expect(mgr).ToNot(BeNil())
@@ -96,7 +92,7 @@ var _ = BeforeSuite(func(done Done) {
 	stopMgr, wg = StartTestManager(mgr)
 
 	close(done)
-}, 180)
+}, 90)
 
 var _ = AfterSuite(func() {
 	By("stopping manager")

@@ -19,7 +19,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"time"
@@ -110,7 +109,6 @@ func NewHealthCheckReconciler(mgr manager.Manager, log logr.Logger, MaxParallel 
 
 // Reconcile per kubebuilder v2 pattern
 func (r *HealthCheckReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	logrus.Info("Calling Reconciler")
 	ctx := context.Background()
 	log := r.Log.WithValues(hcKind, req.NamespacedName)
 	log.Info("Starting HealthCheck reconcile for ...")
@@ -151,12 +149,10 @@ func (r *HealthCheckReconciler) processOrRecoverHealthCheck(ctx context.Context,
 		// Force retry when status fails to update
 		return ctrl.Result{}, err
 	}
-
 	return ret, procErr
 }
 
 func (r *HealthCheckReconciler) processHealthCheck(ctx context.Context, log logr.Logger, healthCheck *activemonitorv1alpha1.HealthCheck) (ctrl.Result, error) {
-
 	hcSpec := healthCheck.Spec
 	if hcSpec.Workflow.Resource != nil {
 		wfNamePrefix := hcSpec.Workflow.GenerateName
@@ -487,6 +483,20 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 			return ignoreNotFound(err)
 		}
 		status, ok := workflow.UnstructuredContent()["status"].(map[string]interface{})
+		log.Info("status of workflow", "status:", status)
+		if status == nil {
+			var elapsed int
+			elapsed = int(now.Time.Sub(then.Time).Seconds())
+			// if the time elapsed is more than repeatAfterSec the workflow will get a SigTerm as activeDeadlineSeconds
+			// is set as the same value as repeatAfterSec, Also the next iteration of monitor will start
+			if elapsed > repeatAfterSec {
+				type s struct {
+					st map[string]interface{}
+				}
+				status, ok = map[string]interface{}{"phase": failStr, "message": failStr}, true
+				log.Info("status of workflow is updated to Failed", "status:", status)
+			}
+		}
 		if ok {
 			log.Info("Workflow status", "status", status["phase"])
 			if status["phase"] == succStr {
@@ -586,6 +596,20 @@ func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctr
 			return ignoreNotFound(err)
 		}
 		status, ok := workflow.UnstructuredContent()["status"].(map[string]interface{})
+		log.Info("status of workflow", "status:", status)
+		if status == nil {
+			var elapsed int
+			elapsed = int(now.Time.Sub(then.Time).Seconds())
+			// if the time elapsed is more than repeatAfterSec the workflow will get a SigTerm as activeDeadlineSeconds
+			// is set as the same value as repeatAfterSec, Also the next iteration of monitor will start
+			if elapsed > hc.Spec.RepeatAfterSec {
+				type s struct {
+					st map[string]interface{}
+				}
+				status, ok = map[string]interface{}{"phase": failStr, "message": failStr}, true
+				log.Info("status of workflow is updated to Failed", "status:", status)
+			}
+		}
 		if ok {
 			log.Info("Workflow status", "status", status["phase"])
 			if status["phase"] == succStr {
