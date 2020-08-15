@@ -485,16 +485,11 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 		status, ok := workflow.UnstructuredContent()["status"].(map[string]interface{})
 		log.Info("status of workflow", "status:", status)
 		elapsed := int(now.Time.Sub(then.Time).Seconds())
+		// if the time elapsed is more than repeatAfterSec/activeDeadlineSeconds the workflow pod will get a SigTerm.
+		//So we are failing the status
 		if status == nil && elapsed > hc.Spec.Workflow.Timeout {
-			// if the time elapsed is more than repeatAfterSec the workflow will get a SigTerm as activeDeadlineSeconds
-			// is set as the same value as repeatAfterSec, Also the next iteration of monitor will start
-			if elapsed > repeatAfterSec {
-				type s struct {
-					st map[string]interface{}
-				}
-				status, ok = map[string]interface{}{"phase": failStr, "message": failStr}, true
-				log.Info("status of workflow is updated to Failed", "status:", status)
-			}
+			status, ok = map[string]interface{}{"phase": failStr, "message": failStr}, true
+			log.Info("status of workflow is updated to Failed", "status:", status)
 		}
 		if ok {
 			log.Info("Workflow status", "status", status["phase"])
@@ -597,16 +592,11 @@ func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctr
 		status, ok := workflow.UnstructuredContent()["status"].(map[string]interface{})
 		log.Info("status of workflow", "status:", status)
 		elapsed := int(now.Time.Sub(then.Time).Seconds())
+		// if the time elapsed is more than repeatAfterSec/activeDeadlineSeconds the workflow pod will get a SigTerm.
+		//So we are failing the status
 		if status == nil && elapsed > hc.Spec.Workflow.Timeout {
-			// if the time elapsed is more than repeatAfterSec the workflow will get a SigTerm as activeDeadlineSeconds
-			// is set as the same value as repeatAfterSec, Also the next iteration of monitor will start
-			if elapsed > hc.Spec.RepeatAfterSec {
-				type s struct {
-					st map[string]interface{}
-				}
-				status, ok = map[string]interface{}{"phase": failStr, "message": failStr}, true
-				log.Info("status of workflow is updated to Failed", "status:", status)
-			}
+			status, ok = map[string]interface{}{"phase": failStr, "message": failStr}, true
+			log.Info("status of workflow is updated to Failed", "status:", status)
 		}
 		if ok {
 			log.Info("Workflow status", "status", status["phase"])
