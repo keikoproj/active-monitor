@@ -26,6 +26,25 @@ import (
 
 // These tests are written in BDD-style using Ginkgo framework. Refer to
 // http://onsi.github.io/ginkgo to learn more.
+var wfSpecTemplate = `
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: scripts-python-
+spec:
+  entrypoint: python-script-example
+  templates:
+    - name: python-script-example
+      steps:
+        - - name: generate
+            template: gen-random-int
+        - - name: print
+            template: print-message
+            arguments:
+              parameters:
+                - name: message
+                  value: "{{steps.generate.outputs.result}}"]
+`
 
 var _ = Describe("HealthCheck", func() {
 	var (
@@ -58,8 +77,15 @@ var _ = Describe("HealthCheck", func() {
 					Namespace: "default",
 				},
 				Spec: HealthCheckSpec{
+					RepeatAfterSec: 60,
 					Workflow: Workflow{
 						GenerateName: "my-sample-workflow-",
+						Resource: &ResourceObject{
+							Namespace:      "health",
+							ServiceAccount: "activemonitor-remedy-sa",
+							Source: ArtifactLocation{
+								Inline: &wfSpecTemplate},
+						},
 					},
 				},
 			}
@@ -88,8 +114,25 @@ var _ = Describe("HealthCheck", func() {
 					Namespace: "default",
 				},
 				Spec: HealthCheckSpec{
+					Level:          "cluster",
+					RepeatAfterSec: 60,
 					Workflow: Workflow{
 						GenerateName: "my-sample-workflow-",
+						Resource: &ResourceObject{
+							Namespace:      "health",
+							ServiceAccount: "activemonitor-remedy-sa",
+							Source: ArtifactLocation{
+								Inline: &wfSpecTemplate},
+						},
+					},
+					RemedyWorkflow: RemedyWorkflow{
+						GenerateName: "my-sample-workflow-",
+						Resource: &ResourceObject{
+							Namespace:      "health",
+							ServiceAccount: "activemonitor-remedy-sa",
+							Source: ArtifactLocation{
+								Inline: &wfSpecTemplate},
+						},
 					},
 				},
 			}

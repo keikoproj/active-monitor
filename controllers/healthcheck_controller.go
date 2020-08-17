@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"time"
 
 	"github.com/ghodss/yaml"
@@ -91,6 +92,17 @@ func ignoreNotFound(err error) error {
 	return err
 }
 
+// NewHealthCheckReconciler returns an instance of HealthCheckReconciler
+func NewHealthCheckReconciler(mgr manager.Manager, log logr.Logger, MaxParallel int) *HealthCheckReconciler {
+	return &HealthCheckReconciler{
+		Client:      mgr.GetClient(),
+		DynClient:   dynamic.NewForConfigOrDie(mgr.GetConfig()),
+		kubeclient:  kubernetes.NewForConfigOrDie(mgr.GetConfig()),
+		Log:         log,
+		MaxParallel: MaxParallel,
+	}
+}
+
 // +kubebuilder:rbac:groups=activemonitor.keikoproj.io,resources=healthchecks,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=activemonitor.keikoproj.io,resources=healthchecks/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=argoproj.io,resources=workflow;workflows,verbs=get;list;watch;create;update;patch;delete
@@ -137,12 +149,10 @@ func (r *HealthCheckReconciler) processOrRecoverHealthCheck(ctx context.Context,
 		// Force retry when status fails to update
 		return ctrl.Result{}, err
 	}
-
 	return ret, procErr
 }
 
 func (r *HealthCheckReconciler) processHealthCheck(ctx context.Context, log logr.Logger, healthCheck *activemonitorv1alpha1.HealthCheck) (ctrl.Result, error) {
-
 	hcSpec := healthCheck.Spec
 	if hcSpec.Workflow.Resource != nil {
 		wfNamePrefix := hcSpec.Workflow.GenerateName
@@ -473,6 +483,14 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 			return ignoreNotFound(err)
 		}
 		status, ok := workflow.UnstructuredContent()["status"].(map[string]interface{})
+		log.Info("status of workflow", "status:", status)
+		elapsed := int(now.Time.Sub(then.Time).Seconds())
+		// if the time elapsed is more than repeatAfterSec/activeDeadlineSeconds the workflow pod will get a SigTerm.
+		//So we are failing the status
+		if status == nil && elapsed > hc.Spec.Workflow.Timeout {
+			status, ok = map[string]interface{}{"phase": failStr, "message": failStr}, true
+			log.Info("status of workflow is updated to Failed", "status:", status)
+		}
 		if ok {
 			log.Info("Workflow status", "status", status["phase"])
 			if status["phase"] == succStr {
@@ -572,6 +590,14 @@ func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctr
 			return ignoreNotFound(err)
 		}
 		status, ok := workflow.UnstructuredContent()["status"].(map[string]interface{})
+		log.Info("status of workflow", "status:", status)
+		elapsed := int(now.Time.Sub(then.Time).Seconds())
+		// if the time elapsed is more than repeatAfterSec/activeDeadlineSeconds the workflow pod will get a SigTerm.
+		//So we are failing the status
+		if status == nil && elapsed > hc.Spec.Workflow.Timeout {
+			status, ok = map[string]interface{}{"phase": failStr, "message": failStr}, true
+			log.Info("status of workflow is updated to Failed", "status:", status)
+		}
 		if ok {
 			log.Info("Workflow status", "status", status["phase"])
 			if status["phase"] == succStr {
@@ -699,6 +725,9 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 	timeout = int64(hc.Spec.RepeatAfterSec)
 	if activeDeadlineSeconds := data["spec"].(map[string]interface{})["activeDeadlineSeconds"]; activeDeadlineSeconds == nil {
 		data["spec"].(map[string]interface{})["activeDeadlineSeconds"] = &timeout
+		hc.Spec.Workflow.Timeout = int(timeout)
+	} else {
+		hc.Spec.Workflow.Timeout = int(activeDeadlineSeconds.(float64))
 	}
 	spec, ok := data["spec"]
 	if !ok {
@@ -789,7 +818,11 @@ func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logg
 	timeout = int64(hc.Spec.RepeatAfterSec)
 	if activeDeadlineSeconds := data["spec"].(map[string]interface{})["activeDeadlineSeconds"]; activeDeadlineSeconds == nil {
 		data["spec"].(map[string]interface{})["activeDeadlineSeconds"] = &timeout
+		hc.Spec.RemedyWorkflow.Timeout = int(timeout)
+	} else {
+		hc.Spec.RemedyWorkflow.Timeout = int(activeDeadlineSeconds.(float64))
 	}
+
 	spec, ok := data["spec"]
 	if !ok {
 		err := errors.New("Invalid workflow, missing spec")

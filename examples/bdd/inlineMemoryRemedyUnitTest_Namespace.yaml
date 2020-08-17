@@ -1,0 +1,47 @@
+apiVersion: activemonitor.keikoproj.io/v1alpha1
+kind: HealthCheck
+metadata:
+  name: inline-monitor-remedy-namespace
+  generateName: fail-healthcheck-
+  namespace: health
+spec:
+  schedule:
+    cron: "@every 5s"
+  level: namespace
+  workflow:
+    generateName: fail-workflow-
+    resource:
+      namespace: health # workflow will be submitted in this ns
+      serviceAccount: activemonitor-healthcheck-sa # workflow will be submitted using this
+      source:
+        inline: |
+            apiVersion: argoproj.io/v1alpha1
+            kind: Workflow
+            spec:
+              entrypoint: start
+              templates:
+              - name: start
+                retryStrategy:
+                  limit: 1
+                container: 
+                  image: ravihari/ctrmemory:v2
+                  command: ["python"]
+                  args: ["promanalysis.py", "http://prometheus.system.svc.cluster.local:9090", "health", "memory-demo", "memory-demo-ctr", "95"]
+  remedyworkflow:
+    generateName: remedy-test-
+    resource:
+      namespace: health # workflow will be submitted in this ns
+      serviceAccount: activemonitor-remedy-sa # workflow will be submitted using this acct
+      source:
+        inline: |
+          apiVersion: argoproj.io/v1alpha1
+          kind: Workflow
+          spec:
+            entrypoint: kubectl
+            templates:
+              -
+                container:
+                  args: ["kubectl delete po/memory-demo"]
+                  command: ["/bin/bash", "-c"]
+                  image: "ravihari/kubectl:v1"
+                name: kubectl
