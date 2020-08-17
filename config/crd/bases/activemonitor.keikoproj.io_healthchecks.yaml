@@ -103,6 +103,8 @@ spec:
                   - namespace
                   - source
                   type: object
+                workflowtimeout:
+                  type: integer
               type: object
             repeatAfterSec:
               type: integer
@@ -154,6 +156,8 @@ spec:
                   - namespace
                   - source
                   type: object
+                workflowtimeout:
+                  type: integer
               type: object
           required:
           - workflow
