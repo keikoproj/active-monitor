@@ -89,6 +89,7 @@ type HealthCheckList struct {
 type RemedyWorkflow struct {
 	GenerateName string          `json:"generateName,omitempty"`
 	Resource     *ResourceObject `json:"resource,omitempty"`
+	Timeout      int             `json:"workflowtimeout,omitempty"`
 }
 
 func (w RemedyWorkflow) IsEmpty() bool {
@@ -99,6 +100,7 @@ func (w RemedyWorkflow) IsEmpty() bool {
 type Workflow struct {
 	GenerateName string          `json:"generateName,omitempty"`
 	Resource     *ResourceObject `json:"resource,omitempty"`
+	Timeout      int             `json:"workflowtimeout,omitempty"`
 }
 
 // ResourceObject is the resource object to create on kubernetes

@@ -191,6 +191,59 @@ spec:
                   command: [sh, -c]
                   args: ["nslookup www.google.com"]
 ```
+#### Sample RemedyWorkflow CR:
+```
+apiVersion: activemonitor.keikoproj.io/v1alpha1
+kind: HealthCheck
+metadata:
+  generateName: fail-healthcheck-
+  namespace: health
+spec:
+  repeatAfterSec: 60 # duration in seconds
+  level: cluster
+  workflow:
+    generateName: fail-workflow-
+    resource:
+      namespace: health # workflow will be submitted in this ns
+      serviceAccount: activemonitor-healthcheck-sa # workflow will be submitted using this
+      source:
+        inline: |
+            apiVersion: argoproj.io/v1alpha1
+            kind: Workflow
+            metadata:
+              labels:
+                workflows.argoproj.io/controller-instanceid: activemonitor-workflows
+            spec:
+              ttlSecondsAfterFinished: 60
+              entrypoint: start
+              templates:
+              - name: start
+                retryStrategy:
+                  limit: 1
+                container: 
+                  image: ravihari/ctrmemory:v2
+                  command: ["python"]
+                  args: ["promanalysis.py", "http://prometheus.system.svc.cluster.local:9090", "health", "memory-demo", "memory-demo-ctr", "95"]
+  remedyworkflow:
+    generateName: remedy-test-
+    resource:
+      namespace: health # workflow will be submitted in this ns
+      serviceAccount: activemonitor-remedy-sa # workflow will be submitted using this acct
+      source:
+        inline: |
+          apiVersion: argoproj.io/v1alpha1
+          kind: Workflow
+          spec:
+            ttlSecondsAfterFinished: 60
+            entrypoint: kubectl
+            templates:
+              -
+                container:
+                  args: ["kubectl delete po/memory-demo"]
+                  command: ["/bin/bash", "-c"]
+                  image: "ravihari/kubectl:v1"
+                name: kubectl
+```
 ![Active-Monitor Architecture](./images/monitoring-example.png)<!-- .element height="50%" width="50%" -->
 
 #### Access Workflows on Argo UI
@@ -204,11 +257,11 @@ Then visit: [http://127.0.0.1:8001](http://127.0.0.1:8001)
 
 Active-Monitor controller also exports metrics in Prometheus format which can be further used for notifications and alerting.
 
-Prometheus metrics are available on `:2112/metrics`
+Prometheus metrics are available on `:8080/metrics`
 ```
-kubectl -n health port-forward deployment/activemonitor-controller 2112:2112
+kubectl -n health port-forward deployment/activemonitor-controller 8080:8080
 ```
-Then visit: [http://localhost:2112/metrics](http://localhost:2112/metrics)
+Then visit: [http://localhost:8080/metrics](http://localhost:8080/metrics)
 
 Active-Monitor, by default, exports following Promethus metrics:
 
