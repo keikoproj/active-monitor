@@ -754,32 +754,18 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 		Strategy string `json:"strategy,omitempty"`
 	}
 
-	var timeoutDelay int64
 	var timeout int64
 
 	if hc.Spec.Workflow.Timeout != 0 {
 		timeout = int64(hc.Spec.Workflow.Timeout)
-		//timeoutDelay = timeout + 30
-		timeoutDelay = timeout
 	} else {
 		hc.Spec.Workflow.Timeout = hc.Spec.RepeatAfterSec
 		timeout = int64(hc.Spec.Workflow.Timeout)
-		//timeoutDelay = timeout + 30
-		timeoutDelay = timeout
 	}
-	//itl := TTLStrategy{
-	//	SecondsAfterCompletion: pointer.Int32Ptr(int32(timeoutDelay)),
-	//}
-	//log.Info("itl set", "itl:", itl)
 	if ttlSecondAfterFinished := data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"]; ttlSecondAfterFinished == nil {
-		data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"] = &timeoutDelay
+		data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"] = defaultWorkflowTTLSec
 	}
 
-	//if ttlStrategy := data["spec"].(map[string]interface{})["ttlStrategy"]; ttlStrategy == nil {
-	//	log.Info("ttlStrategy is nil")
-	//	data["spec"].(map[string]interface{})["ttlStrategy"] = &itl
-	//}
-	log.Info("data for ttl", "data:", data)
 	// set service account, if specified
 	if hc.Spec.Workflow.Resource.ServiceAccount != "" {
 		data["spec"].(map[string]interface{})["serviceAccountName"] = hc.Spec.Workflow.Resource.ServiceAccount
@@ -787,11 +773,8 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 	}
 
 	// and since we will reschedule workflows ourselves, we don't need k8s to try to do so for us
-
 	if activeDeadlineSeconds := data["spec"].(map[string]interface{})["activeDeadlineSeconds"]; activeDeadlineSeconds == nil {
 		data["spec"].(map[string]interface{})["activeDeadlineSeconds"] = &timeout
-		//data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"] = &timeoutDelay
-		//data["spec"].(map[string]interface{})["ttlStrategy.secondsAfterCompletion"] = &timeoutDelay
 	}
 	spec, ok := data["spec"]
 	if !ok {
