@@ -41,6 +41,7 @@ import (
 	activemonitorv1alpha1 "github.com/keikoproj/active-monitor/api/v1alpha1"
 	"github.com/keikoproj/active-monitor/metrics"
 	"github.com/keikoproj/active-monitor/store"
+	iebackoff "github.com/keikoproj/inverse-exp-backoff"
 )
 
 const (
@@ -59,6 +60,10 @@ const (
 	healthCheckNamespaceLevel = "namespace"
 	WfInstanceIdLabelKey      = "workflows.argoproj.io/controller-instanceid"
 	WfInstanceId              = "activemonitor-workflows"
+	PodGCStrategy             = "OnPodCompletion"
+	//PodGCOnPodSuccess         PodGCStrategy = "OnPodSuccess"
+	//PodGCOnWorkflowCompletion PodGCStrategy = "OnWorkflowCompletion"
+	//PodGCOnWorkflowSuccess    PodGCStrategy = "OnWorkflowSuccess"
 )
 
 var (
@@ -122,10 +127,10 @@ func (r *HealthCheckReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 	if err := r.Get(ctx, req.NamespacedName, healthCheck); err != nil {
 		// if our healthcheck was deleted, this Reconcile method is invoked with an empty resource cache
 		// see: https://book.kubebuilder.io/cronjob-tutorial/controller-implementation.html#1-load-the-cronjob-by-name
-		log.Info("Healthcheck object not found for reconciliation, likely deleted", "deleted", "deleted")
+		log.Info("Healthcheck object not found for reconciliation, likely deleted")
 		// stop timer corresponding to next schedule run of workflow since parent healthcheck no longer exists
 		if r.RepeatTimersByName[req.NamespacedName.Name] != nil {
-			log.Info("Cancelling rescheduled workflow for this healthcheck due to deletion", "deleted", "deleted")
+			log.Info("Cancelling rescheduled workflow for this healthcheck due to deletion")
 			r.RepeatTimersByName[req.NamespacedName.Name].Stop()
 		}
 		return ctrl.Result{}, ignoreNotFound(err)
@@ -472,7 +477,18 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 	var now metav1.Time
 	then := metav1.Time{Time: time.Now()}
 	repeatAfterSec := hc.Spec.RepeatAfterSec
-	for {
+	maxTime := time.Duration(hc.Spec.Workflow.Timeout/2) * time.Second
+	if maxTime <= 0 {
+		maxTime = time.Second
+	}
+	minTime := time.Duration(hc.Spec.Workflow.Timeout/60) * time.Second
+	if minTime <= 0 {
+		minTime = time.Second
+	}
+	timeout := time.Duration(hc.Spec.Workflow.Timeout) * time.Second
+	log.Info("IEB with timeout times are", "maxTime:", maxTime, "minTime:", minTime, "timeout:", timeout)
+	for ietest, err1 := iebackoff.NewIEBWithTimeout(maxTime, minTime, timeout, 0.5, time.Now()); ; err1 = ietest.Next() {
+		log.Info("iebackoff iteration", "err1:", err1)
 		now = metav1.Time{Time: time.Now()}
 		// grab workflow object by name and check its status; update healthcheck accordingly
 		// do this once per second until the workflow reaches a terminal state (success/failure)
@@ -483,11 +499,11 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 			return ignoreNotFound(err)
 		}
 		status, ok := workflow.UnstructuredContent()["status"].(map[string]interface{})
-		log.Info("status of workflow", "status:", status)
-		elapsed := int(now.Time.Sub(then.Time).Seconds())
+		log.Info("status of workflow", "status:", status, "ok:", ok)
+		//elapsed := int(now.Time.Sub(then.Time).Seconds())
 		// if the time elapsed is more than repeatAfterSec/activeDeadlineSeconds the workflow pod will get a SigTerm.
 		//So we are failing the status
-		if status == nil && elapsed > hc.Spec.Workflow.Timeout {
+		if err1 != nil {
 			status, ok = map[string]interface{}{"phase": failStr, "message": failStr}, true
 			log.Info("status of workflow is updated to Failed", "status:", status)
 		}
@@ -518,7 +534,10 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 				hc.Status.LastFailedWorkflow = wfName
 				metrics.MonitorError.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": healthcheck}).Inc()
 				metrics.MonitorStartedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": healthcheck}).Set(float64(then.Unix()))
-				metrics.MonitorFinishedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": healthcheck}).Set(float64(now.Time.Unix()))
+				metrics.MonitorFinishedTime.With(prometheus.Labels{"healthc" +
+					"" +
+					"" +
+					"heck_name": hc.GetName(), "workflow": healthcheck}).Set(float64(now.Time.Unix()))
 				if !hc.Spec.RemedyWorkflow.IsEmpty() {
 					err := r.processRemedyWorkflow(ctx, log, wfNamespace, hc)
 					if err != nil {
@@ -529,8 +548,9 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 				break
 			}
 		}
-		// if not breaking out due to a terminal state, sleep and check again shortly
-		time.Sleep(time.Second)
+		//log.Info("try after a second")
+		//// if not breaking out due to a terminal state, sleep and check again shortly
+		//time.Sleep(time.Second)
 	}
 
 	// since the workflow has taken an unknown duration of time to complete, it's possible that its parent
@@ -579,7 +599,13 @@ func (r *HealthCheckReconciler) processRemedyWorkflow(ctx context.Context, log l
 func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctrl.Request, log logr.Logger, wfNamespace string, wfName string, hc *activemonitorv1alpha1.HealthCheck) error {
 	var now metav1.Time
 	then := metav1.Time{Time: time.Now()}
-	for {
+	repeatAfterSec := hc.Spec.RepeatAfterSec
+	//for {
+	maxTime := time.Duration(hc.Spec.Workflow.Timeout/2) * time.Second
+	minTime := time.Duration(hc.Spec.Workflow.Timeout/60) * time.Second
+	timeout := time.Duration(hc.Spec.Workflow.Timeout) * time.Second
+	log.Info("IEB withtimeout times are", "maxTime:", maxTime, "minTime:", minTime, "timeout:", timeout)
+	for ietest, err1 := iebackoff.NewIEBWithTimeout(maxTime, minTime, timeout, 0.5, time.Now()); ; err1 = ietest.Next() {
 		now = metav1.Time{Time: time.Now()}
 		// grab workflow object by name and check its status; update healthcheck accordingly
 		// do this once per second until the workflow reaches a terminal state (success/failure)
@@ -590,11 +616,8 @@ func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctr
 			return ignoreNotFound(err)
 		}
 		status, ok := workflow.UnstructuredContent()["status"].(map[string]interface{})
-		log.Info("status of workflow", "status:", status)
-		elapsed := int(now.Time.Sub(then.Time).Seconds())
-		// if the time elapsed is more than repeatAfterSec/activeDeadlineSeconds the workflow pod will get a SigTerm.
-		//So we are failing the status
-		if status == nil && elapsed > hc.Spec.Workflow.Timeout {
+		log.Info("status of workflow", "status:", status, "ok:", ok)
+		if err1 != nil {
 			status, ok = map[string]interface{}{"phase": failStr, "message": failStr}, true
 			log.Info("status of workflow is updated to Failed", "status:", status)
 		}
@@ -642,6 +665,10 @@ func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctr
 		if err != nil {
 			log.Error(err, "Error updating healthcheck resource")
 		}
+		// reschedule next run of workflow
+		helper := r.createSubmitWorkflowHelper(ctx, log, wfNamespace, hc)
+		r.RepeatTimersByName[hc.GetName()] = time.AfterFunc(time.Duration(repeatAfterSec)*time.Second, helper)
+		log.Info("Rescheduled workflow for next run", "namespace", wfNamespace, "name", wfName)
 	}
 
 	return nil
@@ -712,22 +739,59 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 
 	content := uwf.UnstructuredContent()
 	// make sure workflows by default get cleaned up
-	if ttlSecondAfterFinished := data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"]; ttlSecondAfterFinished == nil {
-		data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"] = defaultWorkflowTTLSec
+
+	//// TTLStrategy is the strategy for the time to live depending on if the workflow succeeded or failed
+	type TTLStrategy struct {
+		SecondsAfterCompletion *int32 `json:"secondsAfterCompletion,omitempty" protobuf:"bytes,1,opt,name=secondsAfterCompletion"`
 	}
+	// PodGC *PodGC `json:"podGC,omitempty" protobuf:"bytes,22,opt,name=podGC"`
+	//type PodGC struct {
+	//	*PodGC `json:"podGC,omitempty" protobuf:"bytes,22,opt,name=podGC"`
+	//}
+	// PodGC describes how to delete completed pods as they complete
+	type PodGC struct {
+		// Strategy is the strategy to use. One of "OnPodCompletion", "OnPodSuccess", "OnWorkflowCompletion", "OnWorkflowSuccess"
+		Strategy string `json:"strategy,omitempty"`
+	}
+
+	var timeoutDelay int64
+	var timeout int64
+
+	if hc.Spec.Workflow.Timeout != 0 {
+		timeout = int64(hc.Spec.Workflow.Timeout)
+		//timeoutDelay = timeout + 30
+		timeoutDelay = timeout
+	} else {
+		hc.Spec.Workflow.Timeout = hc.Spec.RepeatAfterSec
+		timeout = int64(hc.Spec.Workflow.Timeout)
+		//timeoutDelay = timeout + 30
+		timeoutDelay = timeout
+	}
+	//itl := TTLStrategy{
+	//	SecondsAfterCompletion: pointer.Int32Ptr(int32(timeoutDelay)),
+	//}
+	//log.Info("itl set", "itl:", itl)
+	if ttlSecondAfterFinished := data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"]; ttlSecondAfterFinished == nil {
+		data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"] = &timeoutDelay
+	}
+
+	//if ttlStrategy := data["spec"].(map[string]interface{})["ttlStrategy"]; ttlStrategy == nil {
+	//	log.Info("ttlStrategy is nil")
+	//	data["spec"].(map[string]interface{})["ttlStrategy"] = &itl
+	//}
+	log.Info("data for ttl", "data:", data)
 	// set service account, if specified
 	if hc.Spec.Workflow.Resource.ServiceAccount != "" {
 		data["spec"].(map[string]interface{})["serviceAccountName"] = hc.Spec.Workflow.Resource.ServiceAccount
 		log.Info("Set ServiceAccount on Workflow", "ServiceAccount", hc.Spec.Workflow.Resource.ServiceAccount)
 	}
+
 	// and since we will reschedule workflows ourselves, we don't need k8s to try to do so for us
-	var timeout int64
-	timeout = int64(hc.Spec.RepeatAfterSec)
+
 	if activeDeadlineSeconds := data["spec"].(map[string]interface{})["activeDeadlineSeconds"]; activeDeadlineSeconds == nil {
 		data["spec"].(map[string]interface{})["activeDeadlineSeconds"] = &timeout
-		hc.Spec.Workflow.Timeout = int(timeout)
-	} else {
-		hc.Spec.Workflow.Timeout = int(activeDeadlineSeconds.(float64))
+		//data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"] = &timeoutDelay
+		//data["spec"].(map[string]interface{})["ttlStrategy.secondsAfterCompletion"] = &timeoutDelay
 	}
 	spec, ok := data["spec"]
 	if !ok {
