@@ -60,10 +60,6 @@ const (
 	healthCheckNamespaceLevel = "namespace"
 	WfInstanceIdLabelKey      = "workflows.argoproj.io/controller-instanceid"
 	WfInstanceId              = "activemonitor-workflows"
-	PodGCStrategy             = "OnPodCompletion"
-	//PodGCOnPodSuccess         PodGCStrategy = "OnPodSuccess"
-	//PodGCOnWorkflowCompletion PodGCStrategy = "OnWorkflowCompletion"
-	//PodGCOnWorkflowSuccess    PodGCStrategy = "OnWorkflowSuccess"
 )
 
 var (
