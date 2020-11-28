@@ -726,23 +726,7 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 
 	content := uwf.UnstructuredContent()
 	// make sure workflows by default get cleaned up
-
-	//// TTLStrategy is the strategy for the time to live depending on if the workflow succeeded or failed
-	type TTLStrategy struct {
-		SecondsAfterCompletion *int32 `json:"secondsAfterCompletion,omitempty" protobuf:"bytes,1,opt,name=secondsAfterCompletion"`
-	}
-	// PodGC *PodGC `json:"podGC,omitempty" protobuf:"bytes,22,opt,name=podGC"`
-	//type PodGC struct {
-	//	*PodGC `json:"podGC,omitempty" protobuf:"bytes,22,opt,name=podGC"`
-	//}
-	// PodGC describes how to delete completed pods as they complete
-	type PodGC struct {
-		// Strategy is the strategy to use. One of "OnPodCompletion", "OnPodSuccess", "OnWorkflowCompletion", "OnWorkflowSuccess"
-		Strategy string `json:"strategy,omitempty"`
-	}
-
 	var timeout int64
-
 	if hc.Spec.Workflow.Timeout != 0 {
 		timeout = int64(hc.Spec.Workflow.Timeout)
 	} else {
@@ -752,20 +736,18 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 	if ttlSecondAfterFinished := data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"]; ttlSecondAfterFinished == nil {
 		data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"] = defaultWorkflowTTLSec
 	}
-
 	// set service account, if specified
 	if hc.Spec.Workflow.Resource.ServiceAccount != "" {
 		data["spec"].(map[string]interface{})["serviceAccountName"] = hc.Spec.Workflow.Resource.ServiceAccount
 		log.Info("Set ServiceAccount on Workflow", "ServiceAccount", hc.Spec.Workflow.Resource.ServiceAccount)
 	}
-
 	// and since we will reschedule workflows ourselves, we don't need k8s to try to do so for us
 	if activeDeadlineSeconds := data["spec"].(map[string]interface{})["activeDeadlineSeconds"]; activeDeadlineSeconds == nil {
 		data["spec"].(map[string]interface{})["activeDeadlineSeconds"] = &timeout
 	}
 	spec, ok := data["spec"]
 	if !ok {
-		err := errors.New("Invalid workflow, missing spec")
+		err := errors.New("invalid workflow, missing spec")
 		log.Error(err, "Invalid workflow template spec")
 		return err
 	}
