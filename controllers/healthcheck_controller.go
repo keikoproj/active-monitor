@@ -590,7 +590,13 @@ func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctr
 	repeatAfterSec := hc.Spec.RepeatAfterSec
 	//for {
 	maxTime := time.Duration(hc.Spec.Workflow.Timeout/2) * time.Second
+	if maxTime <= 0 {
+		maxTime = time.Second
+	}
 	minTime := time.Duration(hc.Spec.Workflow.Timeout/60) * time.Second
+	if minTime <= 0 {
+		minTime = time.Second
+	}
 	timeout := time.Duration(hc.Spec.Workflow.Timeout) * time.Second
 	log.Info("IEB withtimeout times are", "maxTime:", maxTime, "minTime:", minTime, "timeout:", timeout)
 	for ieTimer, err1 := iebackoff.NewIEBWithTimeout(maxTime, minTime, timeout, 0.5, time.Now()); ; err1 = ieTimer.Next() {
