@@ -483,8 +483,7 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 	}
 	timeout := time.Duration(hc.Spec.Workflow.Timeout) * time.Second
 	log.Info("IEB with timeout times are", "maxTime:", maxTime, "minTime:", minTime, "timeout:", timeout)
-	for ietest, err1 := iebackoff.NewIEBWithTimeout(maxTime, minTime, timeout, 0.5, time.Now()); ; err1 = ietest.Next() {
-		log.Info("iebackoff iteration", "err1:", err1)
+	for ieTimer, err1 := iebackoff.NewIEBWithTimeout(maxTime, minTime, timeout, 0.5, time.Now()); ; err1 = ieTimer.Next() {
 		now = metav1.Time{Time: time.Now()}
 		// grab workflow object by name and check its status; update healthcheck accordingly
 		// do this once per second until the workflow reaches a terminal state (success/failure)
@@ -496,11 +495,10 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 		}
 		status, ok := workflow.UnstructuredContent()["status"].(map[string]interface{})
 		log.Info("status of workflow", "status:", status, "ok:", ok)
-		//elapsed := int(now.Time.Sub(then.Time).Seconds())
-		// if the time elapsed is more than repeatAfterSec/activeDeadlineSeconds the workflow pod will get a SigTerm.
-		//So we are failing the status
+
 		if err1 != nil {
 			status, ok = map[string]interface{}{"phase": failStr, "message": failStr}, true
+			log.Error(err1, "iebackoff err message")
 			log.Info("status of workflow is updated to Failed", "status:", status)
 		}
 		if ok {
@@ -530,10 +528,7 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 				hc.Status.LastFailedWorkflow = wfName
 				metrics.MonitorError.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": healthcheck}).Inc()
 				metrics.MonitorStartedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": healthcheck}).Set(float64(then.Unix()))
-				metrics.MonitorFinishedTime.With(prometheus.Labels{"healthc" +
-					"" +
-					"" +
-					"heck_name": hc.GetName(), "workflow": healthcheck}).Set(float64(now.Time.Unix()))
+				metrics.MonitorFinishedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": healthcheck}).Set(float64(now.Time.Unix()))
 				if !hc.Spec.RemedyWorkflow.IsEmpty() {
 					err := r.processRemedyWorkflow(ctx, log, wfNamespace, hc)
 					if err != nil {
@@ -544,9 +539,6 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 				break
 			}
 		}
-		//log.Info("try after a second")
-		//// if not breaking out due to a terminal state, sleep and check again shortly
-		//time.Sleep(time.Second)
 	}
 
 	// since the workflow has taken an unknown duration of time to complete, it's possible that its parent
@@ -601,7 +593,7 @@ func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctr
 	minTime := time.Duration(hc.Spec.Workflow.Timeout/60) * time.Second
 	timeout := time.Duration(hc.Spec.Workflow.Timeout) * time.Second
 	log.Info("IEB withtimeout times are", "maxTime:", maxTime, "minTime:", minTime, "timeout:", timeout)
-	for ietest, err1 := iebackoff.NewIEBWithTimeout(maxTime, minTime, timeout, 0.5, time.Now()); ; err1 = ietest.Next() {
+	for ieTimer, err1 := iebackoff.NewIEBWithTimeout(maxTime, minTime, timeout, 0.5, time.Now()); ; err1 = ieTimer.Next() {
 		now = metav1.Time{Time: time.Now()}
 		// grab workflow object by name and check its status; update healthcheck accordingly
 		// do this once per second until the workflow reaches a terminal state (success/failure)
@@ -615,6 +607,7 @@ func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctr
 		log.Info("status of workflow", "status:", status, "ok:", ok)
 		if err1 != nil {
 			status, ok = map[string]interface{}{"phase": failStr, "message": failStr}, true
+			log.Error(err1, "iebackoff err message")
 			log.Info("status of workflow is updated to Failed", "status:", status)
 		}
 		if ok {
@@ -648,8 +641,6 @@ func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctr
 				break
 			}
 		}
-		// if not breaking out due to a terminal state, sleep and check again shortly
-		time.Sleep(time.Second)
 	}
 
 	// since the workflow has taken an unknown duration of time to complete, it's possible that its parent
