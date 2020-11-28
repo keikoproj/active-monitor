@@ -4,22 +4,22 @@
 [![PR](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)][GithubPrsUrl]
 [![slack](https://img.shields.io/badge/slack-join%20the%20conversation-ff69b4.svg)][SlackUrl]
 
-![version](https://img.shields.io/badge/version-0.3.0-blue.svg?cacheSeconds=2592000)
+![version](https://img.shields.io/badge/version-0.4.0-blue.svg?cacheSeconds=2592000)
 [![Build Status][BuildStatusImg]][BuildMasterUrl]
 [![codecov][CodecovImg]][CodecovUrl]
 [![Go Report Card][GoReportImg]][GoReportUrl]
 
 ## Motivation
-Active-Monitor is a Kubernetes custom resource controller which enables deep cluster monitoring using [Argo workflows](https://github.com/argoproj/argo).
+Active-Monitor is a Kubernetes custom resource controller which enables deep cluster monitoring and self-healing using [Argo workflows](https://github.com/argoproj/argo).
 
 While it is not too difficult to know that all entities in a cluster are running individually, it is often quite challenging to know that they can all coordinate with each other as required for successful cluster operation (network connectivity, volume access, etc).
 
 ## Overview
-Active-Monitor will create a new `health` namespace when installed in the cluster. Users can then create and submit HealthCheck objects to the Kubernetes server. A HealthCheck is essentially an instrumented wrapper around an Argo workflow.
+Active-Monitor will create a new `health` namespace when installed in the cluster. Users can then create and submit HealthCheck object to the Kubernetes server. A HealthCheck / Remedy is essentially an instrumented wrapper around an Argo workflow.
 
-The workflow is run periodically, as defined by `repeatAfterSec` property in its spec, and watched by the Active-Monitor controller.
+The HealthCheck workflow is run periodically, as defined by `repeatAfterSec` or a  `schedule: cron` property in its spec, and watched by the Active-Monitor controller.
 
-Active-Monitor sets the status of the HealthCheck CR to indicate whether the monitoring check succeeded or failed. External systems can query these CRs and take appropriate action if they failed.
+Active-Monitor sets the status of the HealthCheck CR to indicate whether the monitoring check succeeded or failed. If in case the monitoring check failed then the Remedy workflow will execute to fix the issue. Status of Remedy will be updated in the CR. External systems can query these CRs and take appropriate action if they failed.
 
 Typical examples of such workflows include tests for basic Kubernetes object creation/deletion, tests for cluster-wide services such as policy engines checks, authentication and authorization checks, etc.
 
@@ -29,6 +29,9 @@ The sort of HealthChecks one could run with Active-Monitor are:
 - verify kube-dns by running DNS lookups on the network
 - verify kube-dns by running DNS lookups on localhost
 - verify KIAM agent by running aws sts get-caller-identity on all available nodes
+- verify if pod max threads has reached
+- verify if storage volume for a pod (e.g: prometheus) has reached its capacity.
+- verify if critical pods e.g: calico, kube-dns/core-dns pods are in a failed or crashloopbackoff state
 
 With the Cluster/Namespace level, healthchecks can be run in any namespace provided namespace is already created.
 The `level` in the `HealthCheck` spec defines at which level it runs; it can be either `Namespace` or `Cluster`.
@@ -187,6 +190,59 @@ spec:
                   command: [sh, -c]
                   args: ["nslookup www.google.com"]
 ```
+#### Sample RemedyWorkflow CR:
+```
+apiVersion: activemonitor.keikoproj.io/v1alpha1
+kind: HealthCheck
+metadata:
+  generateName: fail-healthcheck-
+  namespace: health
+spec:
+  repeatAfterSec: 60 # duration in seconds
+  level: cluster
+  workflow:
+    generateName: fail-workflow-
+    resource:
+      namespace: health # workflow will be submitted in this ns
+      serviceAccount: activemonitor-healthcheck-sa # workflow will be submitted using this
+      source:
+        inline: |
+            apiVersion: argoproj.io/v1alpha1
+            kind: Workflow
+            metadata:
+              labels:
+                workflows.argoproj.io/controller-instanceid: activemonitor-workflows
+            spec:
+              ttlSecondsAfterFinished: 60
+              entrypoint: start
+              templates:
+              - name: start
+                retryStrategy:
+                  limit: 1
+                container: 
+                  image: ravihari/ctrmemory:v2
+                  command: ["python"]
+                  args: ["promanalysis.py", "http://prometheus.system.svc.cluster.local:9090", "health", "memory-demo", "memory-demo-ctr", "95"]
+  remedyworkflow:
+    generateName: remedy-test-
+    resource:
+      namespace: health # workflow will be submitted in this ns
+      serviceAccount: activemonitor-remedy-sa # workflow will be submitted using this acct
+      source:
+        inline: |
+          apiVersion: argoproj.io/v1alpha1
+          kind: Workflow
+          spec:
+            ttlSecondsAfterFinished: 60
+            entrypoint: kubectl
+            templates:
+              -
+                container:
+                  args: ["kubectl delete po/memory-demo"]
+                  command: ["/bin/bash", "-c"]
+                  image: "ravihari/kubectl:v1"
+                name: kubectl
+```
 ![Active-Monitor Architecture](./images/monitoring-example.png)<!-- .element height="50%" width="50%" -->
 
 #### Access Workflows on Argo UI
@@ -200,11 +256,11 @@ Then visit: [http://127.0.0.1:8001](http://127.0.0.1:8001)
 
 Active-Monitor controller also exports metrics in Prometheus format which can be further used for notifications and alerting.
 
-Prometheus metrics are available on `:2112/metrics`
+Prometheus metrics are available on `:8080/metrics`
 ```
-kubectl -n health port-forward deployment/activemonitor-controller 2112:2112
+kubectl -n health port-forward deployment/activemonitor-controller 8080:8080
 ```
-Then visit: [http://localhost:2112/metrics](http://localhost:2112/metrics)
+Then visit: [http://localhost:8080/metrics](http://localhost:8080/metrics)
 
 Active-Monitor, by default, exports following Promethus metrics:
 
