@@ -41,6 +41,7 @@ import (
 	activemonitorv1alpha1 "github.com/keikoproj/active-monitor/api/v1alpha1"
 	"github.com/keikoproj/active-monitor/metrics"
 	"github.com/keikoproj/active-monitor/store"
+	iebackoff "github.com/keikoproj/inverse-exp-backoff"
 )
 
 const (
@@ -472,7 +473,17 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 	var now metav1.Time
 	then := metav1.Time{Time: time.Now()}
 	repeatAfterSec := hc.Spec.RepeatAfterSec
-	for {
+	maxTime := time.Duration(hc.Spec.Workflow.Timeout/2) * time.Second
+	if maxTime <= 0 {
+		maxTime = time.Second
+	}
+	minTime := time.Duration(hc.Spec.Workflow.Timeout/60) * time.Second
+	if minTime <= 0 {
+		minTime = time.Second
+	}
+	timeout := time.Duration(hc.Spec.Workflow.Timeout) * time.Second
+	log.Info("IEB with timeout times are", "maxTime:", maxTime, "minTime:", minTime, "timeout:", timeout)
+	for ieTimer, err1 := iebackoff.NewIEBWithTimeout(maxTime, minTime, timeout, 0.5, time.Now()); ; err1 = ieTimer.Next() {
 		now = metav1.Time{Time: time.Now()}
 		// grab workflow object by name and check its status; update healthcheck accordingly
 		// do this once per second until the workflow reaches a terminal state (success/failure)
@@ -483,12 +494,11 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 			return ignoreNotFound(err)
 		}
 		status, ok := workflow.UnstructuredContent()["status"].(map[string]interface{})
-		log.Info("status of workflow", "status:", status)
-		elapsed := int(now.Time.Sub(then.Time).Seconds())
-		// if the time elapsed is more than repeatAfterSec/activeDeadlineSeconds the workflow pod will get a SigTerm.
-		//So we are failing the status
-		if status == nil && elapsed > hc.Spec.Workflow.Timeout {
+		log.Info("status of workflow", "status:", status, "ok:", ok)
+
+		if err1 != nil {
 			status, ok = map[string]interface{}{"phase": failStr, "message": failStr}, true
+			log.Error(err1, "iebackoff err message")
 			log.Info("status of workflow is updated to Failed", "status:", status)
 		}
 		if ok {
@@ -529,8 +539,6 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 				break
 			}
 		}
-		// if not breaking out due to a terminal state, sleep and check again shortly
-		time.Sleep(time.Second)
 	}
 
 	// since the workflow has taken an unknown duration of time to complete, it's possible that its parent
@@ -579,7 +587,19 @@ func (r *HealthCheckReconciler) processRemedyWorkflow(ctx context.Context, log l
 func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctrl.Request, log logr.Logger, wfNamespace string, wfName string, hc *activemonitorv1alpha1.HealthCheck) error {
 	var now metav1.Time
 	then := metav1.Time{Time: time.Now()}
-	for {
+	repeatAfterSec := hc.Spec.RepeatAfterSec
+	//for {
+	maxTime := time.Duration(hc.Spec.Workflow.Timeout/2) * time.Second
+	if maxTime <= 0 {
+		maxTime = time.Second
+	}
+	minTime := time.Duration(hc.Spec.Workflow.Timeout/60) * time.Second
+	if minTime <= 0 {
+		minTime = time.Second
+	}
+	timeout := time.Duration(hc.Spec.Workflow.Timeout) * time.Second
+	log.Info("IEB withtimeout times are", "maxTime:", maxTime, "minTime:", minTime, "timeout:", timeout)
+	for ieTimer, err1 := iebackoff.NewIEBWithTimeout(maxTime, minTime, timeout, 0.5, time.Now()); ; err1 = ieTimer.Next() {
 		now = metav1.Time{Time: time.Now()}
 		// grab workflow object by name and check its status; update healthcheck accordingly
 		// do this once per second until the workflow reaches a terminal state (success/failure)
@@ -590,12 +610,10 @@ func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctr
 			return ignoreNotFound(err)
 		}
 		status, ok := workflow.UnstructuredContent()["status"].(map[string]interface{})
-		log.Info("status of workflow", "status:", status)
-		elapsed := int(now.Time.Sub(then.Time).Seconds())
-		// if the time elapsed is more than repeatAfterSec/activeDeadlineSeconds the workflow pod will get a SigTerm.
-		//So we are failing the status
-		if status == nil && elapsed > hc.Spec.Workflow.Timeout {
+		log.Info("status of workflow", "status:", status, "ok:", ok)
+		if err1 != nil {
 			status, ok = map[string]interface{}{"phase": failStr, "message": failStr}, true
+			log.Error(err1, "iebackoff err message")
 			log.Info("status of workflow is updated to Failed", "status:", status)
 		}
 		if ok {
@@ -629,8 +647,6 @@ func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctr
 				break
 			}
 		}
-		// if not breaking out due to a terminal state, sleep and check again shortly
-		time.Sleep(time.Second)
 	}
 
 	// since the workflow has taken an unknown duration of time to complete, it's possible that its parent
@@ -642,6 +658,10 @@ func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctr
 		if err != nil {
 			log.Error(err, "Error updating healthcheck resource")
 		}
+		// reschedule next run of workflow
+		helper := r.createSubmitWorkflowHelper(ctx, log, wfNamespace, hc)
+		r.RepeatTimersByName[hc.GetName()] = time.AfterFunc(time.Duration(repeatAfterSec)*time.Second, helper)
+		log.Info("Rescheduled workflow for next run", "namespace", wfNamespace, "name", wfName)
 	}
 
 	return nil
@@ -712,6 +732,13 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 
 	content := uwf.UnstructuredContent()
 	// make sure workflows by default get cleaned up
+	var timeout int64
+	if hc.Spec.Workflow.Timeout != 0 {
+		timeout = int64(hc.Spec.Workflow.Timeout)
+	} else {
+		hc.Spec.Workflow.Timeout = hc.Spec.RepeatAfterSec
+		timeout = int64(hc.Spec.Workflow.Timeout)
+	}
 	if ttlSecondAfterFinished := data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"]; ttlSecondAfterFinished == nil {
 		data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"] = defaultWorkflowTTLSec
 	}
@@ -721,17 +748,12 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 		log.Info("Set ServiceAccount on Workflow", "ServiceAccount", hc.Spec.Workflow.Resource.ServiceAccount)
 	}
 	// and since we will reschedule workflows ourselves, we don't need k8s to try to do so for us
-	var timeout int64
-	timeout = int64(hc.Spec.RepeatAfterSec)
 	if activeDeadlineSeconds := data["spec"].(map[string]interface{})["activeDeadlineSeconds"]; activeDeadlineSeconds == nil {
 		data["spec"].(map[string]interface{})["activeDeadlineSeconds"] = &timeout
-		hc.Spec.Workflow.Timeout = int(timeout)
-	} else {
-		hc.Spec.Workflow.Timeout = int(activeDeadlineSeconds.(float64))
 	}
 	spec, ok := data["spec"]
 	if !ok {
-		err := errors.New("Invalid workflow, missing spec")
+		err := errors.New("invalid workflow, missing spec")
 		log.Error(err, "Invalid workflow template spec")
 		return err
 	}
