@@ -149,10 +149,10 @@ metadata:
   namespace: health
 data:
   config: |
-    instanceID: keiko-workflows
+    instanceID: activemonitor-workflows
     namespace: health
 ---
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: workflow-controller
@@ -228,12 +228,6 @@ subjects:
   namespace: health
 ---
 apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: workflow-controller-configmap
-  namespace: health
----
-apiVersion: v1
 kind: Service
 metadata:
   name: argo-ui
@@ -245,7 +239,7 @@ spec:
   selector:
     app: argo-ui
 ---
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: argo-ui

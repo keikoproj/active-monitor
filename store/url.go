@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 
 	"github.com/keikoproj/active-monitor/api/v1alpha1"
 	"github.com/sirupsen/logrus"
@@ -40,7 +41,7 @@ func (reader *URLReader) Read() ([]byte, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		logrus.Warnf("failed to read %s. status code: %d", reader.urlArtifact.Path, resp.StatusCode)
-		return nil, errors.New("status code " + string(resp.StatusCode))
+		return nil, errors.New("status code " + strconv.Itoa(resp.StatusCode))
 	}
 
 	content, err := ioutil.ReadAll(resp.Body)

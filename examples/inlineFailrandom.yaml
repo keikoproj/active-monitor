@@ -16,15 +16,16 @@ spec:
             apiVersion: argoproj.io/v1alpha1
             kind: Workflow
             metadata:
-              generateName: fail-workflow-
+              labels:
+                workflows.argoproj.io/controller-instanceid: activemonitor-workflows
             spec:
               ttlSecondsAfterFinished: 60
               entrypoint: start
               templates:
               - name: start
                 retryStrategy:
-                  limit: 3
+                  limit: 1
                 container: 
-                  image: alpine
-                  command: [sh, -c]
-                  args: ["fail"]
+                  image: docker/whalesay:latest
+                  command: [/bin/bash, -c]
+                  args: ["P=(0 1); exit ${P[RANDOM%2]};"]    
