@@ -659,10 +659,6 @@ func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctr
 		if err != nil {
 			log.Error(err, "Error updating healthcheck resource")
 		}
-		// reschedule next run of workflow
-		//helper := r.createSubmitWorkflowHelper(ctx, log, wfNamespace, hc)
-		//r.RepeatTimersByName[hc.GetName()] = time.AfterFunc(time.Duration(repeatAfterSec)*time.Second, helper)
-		//log.Info("Rescheduled workflow for next run", "namespace", wfNamespace, "name", wfName)
 	}
 
 	return nil
