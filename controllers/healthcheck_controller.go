@@ -61,9 +61,6 @@ const (
 	WfInstanceIdLabelKey      = "workflows.argoproj.io/controller-instanceid"
 	WfInstanceId              = "activemonitor-workflows"
 	PodGCOnPodCompletion      = "OnPodCompletion"
-	//PodGCOnPodSuccess         = "OnPodSuccess"
-	//PodGCOnWorkflowCompletion = "OnWorkflowCompletion"
-	//PodGCOnWorkflowSuccess    = "OnWorkflowSuccess"
 )
 
 var (
