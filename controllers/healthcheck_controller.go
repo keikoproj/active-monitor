@@ -589,8 +589,6 @@ func (r *HealthCheckReconciler) processRemedyWorkflow(ctx context.Context, log l
 func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctrl.Request, log logr.Logger, wfNamespace string, wfName string, hc *activemonitorv1alpha1.HealthCheck) error {
 	var now metav1.Time
 	then := metav1.Time{Time: time.Now()}
-	//repeatAfterSec := hc.Spec.RepeatAfterSec
-	//for {
 	maxTime := time.Duration(hc.Spec.Workflow.Timeout/2) * time.Second
 	if maxTime <= 0 {
 		maxTime = time.Second
