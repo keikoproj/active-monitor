@@ -60,6 +60,10 @@ const (
 	healthCheckNamespaceLevel = "namespace"
 	WfInstanceIdLabelKey      = "workflows.argoproj.io/controller-instanceid"
 	WfInstanceId              = "activemonitor-workflows"
+	PodGCOnPodCompletion      = "OnPodCompletion"
+	//PodGCOnPodSuccess         = "OnPodSuccess"
+	//PodGCOnWorkflowCompletion = "OnWorkflowCompletion"
+	//PodGCOnWorkflowSuccess    = "OnWorkflowSuccess"
 )
 
 var (
@@ -588,7 +592,7 @@ func (r *HealthCheckReconciler) processRemedyWorkflow(ctx context.Context, log l
 func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctrl.Request, log logr.Logger, wfNamespace string, wfName string, hc *activemonitorv1alpha1.HealthCheck) error {
 	var now metav1.Time
 	then := metav1.Time{Time: time.Now()}
-	repeatAfterSec := hc.Spec.RepeatAfterSec
+	//repeatAfterSec := hc.Spec.RepeatAfterSec
 	//for {
 	maxTime := time.Duration(hc.Spec.Workflow.Timeout/2) * time.Second
 	if maxTime <= 0 {
@@ -660,9 +664,9 @@ func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctr
 			log.Error(err, "Error updating healthcheck resource")
 		}
 		// reschedule next run of workflow
-		helper := r.createSubmitWorkflowHelper(ctx, log, wfNamespace, hc)
-		r.RepeatTimersByName[hc.GetName()] = time.AfterFunc(time.Duration(repeatAfterSec)*time.Second, helper)
-		log.Info("Rescheduled workflow for next run", "namespace", wfNamespace, "name", wfName)
+		//helper := r.createSubmitWorkflowHelper(ctx, log, wfNamespace, hc)
+		//r.RepeatTimersByName[hc.GetName()] = time.AfterFunc(time.Duration(repeatAfterSec)*time.Second, helper)
+		//log.Info("Rescheduled workflow for next run", "namespace", wfNamespace, "name", wfName)
 	}
 
 	return nil
@@ -732,6 +736,19 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 	}
 
 	content := uwf.UnstructuredContent()
+	type PodGCStrategy string
+	// PodGC describes how to delete completed pods as they complete
+	type PodGC struct {
+	// Strategy is the strategy to use. One of "OnPodCompletion", "OnPodSuccess", "OnWorkflowCompletion", "OnWorkflowSuccess"
+	Strategy      PodGCStrategy `json:"strategy,omitempty" protobuf:"bytes,1,opt,name=strategy,casttype=PodGCStrategy"`
+}
+	pgc := PodGC{
+		Strategy: PodGCOnPodCompletion,
+	}
+	if podGC := data["spec"].(map[string]interface{})["podGC"]; podGC == nil {
+		log.Info("PodGC is nil")
+		data["spec"].(map[string]interface{})["podGC"] = &pgc
+	}
 	// make sure workflows by default get cleaned up
 	var timeout int64
 	if hc.Spec.Workflow.Timeout != 0 {
@@ -752,6 +769,7 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 	if activeDeadlineSeconds := data["spec"].(map[string]interface{})["activeDeadlineSeconds"]; activeDeadlineSeconds == nil {
 		data["spec"].(map[string]interface{})["activeDeadlineSeconds"] = &timeout
 	}
+	log.Info("HealthCheck with Workflow", "Spec:", data)
 	spec, ok := data["spec"]
 	if !ok {
 		err := errors.New("invalid workflow, missing spec")
@@ -827,6 +845,19 @@ func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logg
 	}
 
 	content := uwf.UnstructuredContent()
+	type PodGCStrategy string
+	// PodGC describes how to delete completed pods as they complete
+	type PodGC struct {
+		// Strategy is the strategy to use. One of "OnPodCompletion", "OnPodSuccess", "OnWorkflowCompletion", "OnWorkflowSuccess"
+		Strategy      PodGCStrategy `json:"strategy,omitempty" protobuf:"bytes,1,opt,name=strategy,casttype=PodGCStrategy"`
+	}
+	pgc := PodGC{
+		Strategy: PodGCOnPodCompletion,
+	}
+	if podGC := data["spec"].(map[string]interface{})["podGC"]; podGC == nil {
+		log.Info("PodGC is nil")
+		data["spec"].(map[string]interface{})["podGC"] = &pgc
+	}
 	// make sure workflows by default get cleaned up
 	if ttlSecondAfterFinished := data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"]; ttlSecondAfterFinished == nil {
 		data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"] = defaultWorkflowTTLSec
