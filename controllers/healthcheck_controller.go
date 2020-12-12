@@ -531,6 +531,23 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 				metrics.MonitorStartedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": healthcheck}).Set(float64(then.Unix()))
 				metrics.MonitorFinishedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": healthcheck}).Set(float64(now.Time.Unix()))
 				if !hc.Spec.RemedyWorkflow.IsEmpty() {
+					log.Info("Remedy values:", "RemedyTotalRuns:", hc.Status.RemedyTotalRuns)
+					if hc.Spec.RemedyRunsLimit != 0 && hc.Spec.RemedyResetInterval != 0 && hc.Spec.RemedyRunsLimit < hc.Status.RemedyTotalRuns {
+						log.Info("RemedyRuns to be runs Limit", "RemedyRunsLimit", hc.Spec.RemedyRunsLimit, "RemedyResetInterval", hc.Spec.RemedyResetInterval)
+						if hc.Status.RemedyTotalRuns >= 1 {
+							log.Info("Remedy interval from last time run:", "intervaltime:", int(now.Time.Sub(hc.Status.RemedyFinishedAt.Time).Seconds()))
+						}
+						if hc.Spec.RemedyResetInterval <= (int(now.Time.Sub(hc.Status.RemedyFinishedAt.Time).Seconds())) {
+							hc.Status.RemedyTotalRuns = 0
+							hc.Status.RemedyFinishedAt = nil
+							hc.Status.RemedyStartedAt = nil
+							hc.Status.RemedyFailedCount = 0
+							hc.Status.RemedySuccessCount = 0
+							hc.Status.RemedyLastFailedAt = nil
+							hc.Status.RemedyStatus = "remedy is reset"
+							log.Info("RemedyRuns is reset", "RemedyTotalRuns:", hc.Status.RemedyTotalRuns, "RemedySuccessCount", hc.Status.RemedySuccessCount, "RemedyFailedCount", hc.Status.RemedyFailedCount)
+						}
+					}
 					err := r.processRemedyWorkflow(ctx, log, wfNamespace, hc)
 					if err != nil {
 						log.Error(err, "Error  executing RemedyWorkflow")
