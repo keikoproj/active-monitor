@@ -203,33 +203,33 @@ metadata:
   generateName: fail-healthcheck-
   namespace: health
 spec:
-  repeatAfterSec: 60 # duration in seconds
+  repeatAfterSec: 30 # duration in seconds
   level: cluster
   remedyRunsLimit: 2
   remedyResetInterval: 300
   workflow:
-    generateName: fail-workflow-
+    generateName: randomfail-workflow-
     resource:
       namespace: health # workflow will be submitted in this ns
-      serviceAccount: activemonitor-healthcheck-sa # workflow will be submitted using this
+      serviceAccount: activemonitor-controller-sa # workflow will be submitted using this
       source:
         inline: |
-            apiVersion: argoproj.io/v1alpha1
-            kind: Workflow
-            metadata:
-              labels:
-                workflows.argoproj.io/controller-instanceid: activemonitor-workflows
-            spec:
-              ttlSecondsAfterFinished: 60
-              entrypoint: start
-              templates:
-              - name: start
-                retryStrategy:
-                  limit: 1
-                container: 
-                  image: ravihari/ctrmemory:v2
-                  command: ["python"]
-                  args: ["promanalysis.py", "http://prometheus.system.svc.cluster.local:9090", "health", "memory-demo", "memory-demo-ctr", "95"]
+          apiVersion: argoproj.io/v1alpha1
+          kind: Workflow
+          metadata:
+            labels:
+              workflows.argoproj.io/controller-instanceid: activemonitor-workflows
+          spec:
+            ttlSecondsAfterFinished: 60
+            podGC:
+              strategy: OnWorkflowSuccess
+            entrypoint: start
+            templates:
+            - name: start
+              container:
+                image: docker/whalesay:latest
+                command: [/bin/bash, -c]
+                args: ["echo 'Running command';P=(1 0); exit ${P[RANDOM%2]};"]
   remedyworkflow:
     generateName: remedy-test-
     resource:
@@ -239,16 +239,21 @@ spec:
         inline: |
           apiVersion: argoproj.io/v1alpha1
           kind: Workflow
+          metadata:
+            labels:
+              workflows.argoproj.io/controller-instanceid: activemonitor-workflows
+            generateName: hello-world-
           spec:
-            ttlSecondsAfterFinished: 60
-            entrypoint: kubectl
+            entrypoint: whalesay
             templates:
               -
                 container:
-                  args: ["kubectl delete po/memory-demo"]
-                  command: ["/bin/bash", "-c"]
-                  image: "ravihari/kubectl:v1"
-                name: kubectl
+                  args:
+                    - "hello world"
+                  command:
+                    - cowsay
+                  image: "docker/whalesay:latest"
+                name: whalesay
 ```
 ![Active-Monitor Architecture](./images/monitoring-example.png)<!-- .element height="50%" width="50%" -->
 
