@@ -62,6 +62,10 @@ spec:
               type: string
             level:
               type: string
+            remedyResetInterval:
+              type: integer
+            remedyRunsLimit:
+              type: integer
             remedyworkflow:
               description: Workflow struct describes a Remedy workflow
               properties:

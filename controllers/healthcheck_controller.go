@@ -364,7 +364,7 @@ func (r *HealthCheckReconciler) deleteRBACForWorkflow(log logr.Logger, hc *activ
 			log.Error(err, "Error creating ClusterRoleBinding for the workflow")
 			return err
 		}
-		log.Info("Successfully Created", "ClusterRoleBinding", amclusterRoleRemedyBinding)
+		log.Info("Successfully Deleted", "ClusterRoleBinding", amclusterRoleRemedyBinding)
 
 	} else if level == "namespace" {
 
@@ -517,6 +517,17 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 				metrics.MonitorRuntime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": healthcheck}).Set(now.Time.Sub(then.Time).Seconds())
 				metrics.MonitorStartedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": healthcheck}).Set(float64(then.Unix()))
 				metrics.MonitorFinishedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": healthcheck}).Set(float64(hc.Status.FinishedAt.Unix()))
+				if !hc.Spec.RemedyWorkflow.IsEmpty() && hc.Status.RemedyTotalRuns >= 1 {
+					// HealthCheck Passed so remedy values are reset
+					hc.Status.RemedyTotalRuns = 0
+					hc.Status.RemedyFinishedAt = nil
+					hc.Status.RemedyStartedAt = nil
+					hc.Status.RemedyFailedCount = 0
+					hc.Status.RemedySuccessCount = 0
+					hc.Status.RemedyLastFailedAt = nil
+					hc.Status.RemedyStatus = "HealthCheck Passed so Remedy is reset"
+					log.Info("HealthCheck passed so Remedy is reset", "RemedyTotalRuns:", hc.Status.RemedyTotalRuns, "RemedySuccessCount", hc.Status.RemedySuccessCount, "RemedyFailedCount", hc.Status.RemedyFailedCount)
+				}
 				break
 			} else if status["phase"] == failStr {
 				hc.Status.Status = failStr
@@ -530,28 +541,46 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 				metrics.MonitorError.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": healthcheck}).Inc()
 				metrics.MonitorStartedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": healthcheck}).Set(float64(then.Unix()))
 				metrics.MonitorFinishedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": healthcheck}).Set(float64(now.Time.Unix()))
+				log.Info("Remedy values:", "RemedyTotalRuns:", hc.Status.RemedyTotalRuns)
 				if !hc.Spec.RemedyWorkflow.IsEmpty() {
-					log.Info("Remedy values:", "RemedyTotalRuns:", hc.Status.RemedyTotalRuns)
-					if hc.Spec.RemedyRunsLimit != 0 && hc.Spec.RemedyResetInterval != 0 && hc.Spec.RemedyRunsLimit < hc.Status.RemedyTotalRuns {
-						log.Info("RemedyRuns to be runs Limit", "RemedyRunsLimit", hc.Spec.RemedyRunsLimit, "RemedyResetInterval", hc.Spec.RemedyResetInterval)
-						if hc.Status.RemedyTotalRuns >= 1 {
-							log.Info("Remedy interval from last time run:", "intervaltime:", int(now.Time.Sub(hc.Status.RemedyFinishedAt.Time).Seconds()))
+					log.Info("RemedyWorkflow not empty:")
+					if hc.Spec.RemedyRunsLimit != 0 && hc.Spec.RemedyResetInterval != 0 {
+						log.Info("RemedyRunsLimit and  RemedyResetInterval values are", "RemedyRunsLimit", hc.Spec.RemedyRunsLimit, "RemedyResetInterval", hc.Spec.RemedyResetInterval)
+						if hc.Spec.RemedyRunsLimit > hc.Status.RemedyTotalRuns {
+							log.Info("RemedyRunsLimit is greater than  RemedyTotalRuns", "RemedyRunsLimit", hc.Spec.RemedyRunsLimit, "RemedyTotalRuns", hc.Status.RemedyTotalRuns)
+							err := r.processRemedyWorkflow(ctx, log, wfNamespace, hc)
+							if err != nil {
+								log.Error(err, "Error  executing RemedyWorkflow")
+								return err
+							}
+						} else {
+							remedylastruntime := int(now.Time.Sub(hc.Status.RemedyFinishedAt.Time).Seconds())
+							log.Info("Remedy interval from last time run:", "intervalTime:", remedylastruntime)
+							if hc.Spec.RemedyResetInterval >= remedylastruntime {
+								log.Info("skipping remedy as the remedy limit criteria is met. Remedy will be run after reset interval")
+							} else {
+								hc.Status.RemedyTotalRuns = 0
+								hc.Status.RemedyFinishedAt = nil
+								hc.Status.RemedyStartedAt = nil
+								hc.Status.RemedyFailedCount = 0
+								hc.Status.RemedySuccessCount = 0
+								hc.Status.RemedyLastFailedAt = nil
+								hc.Status.RemedyStatus = "RemedyResetInterval elapsed so Remedy is reset"
+								log.Info("RemedyResetInterval elapsed so Remedy is reset", "RemedyTotalRuns:", hc.Status.RemedyTotalRuns, "RemedySuccessCount", hc.Status.RemedySuccessCount, "RemedyFailedCount", hc.Status.RemedyFailedCount)
+								err := r.processRemedyWorkflow(ctx, log, wfNamespace, hc)
+								if err != nil {
+									log.Error(err, "Error  executing RemedyWorkflow")
+									return err
+								}
+							}
 						}
-						if hc.Spec.RemedyResetInterval <= (int(now.Time.Sub(hc.Status.RemedyFinishedAt.Time).Seconds())) {
-							hc.Status.RemedyTotalRuns = 0
-							hc.Status.RemedyFinishedAt = nil
-							hc.Status.RemedyStartedAt = nil
-							hc.Status.RemedyFailedCount = 0
-							hc.Status.RemedySuccessCount = 0
-							hc.Status.RemedyLastFailedAt = nil
-							hc.Status.RemedyStatus = "remedy is reset"
-							log.Info("RemedyRuns is reset", "RemedyTotalRuns:", hc.Status.RemedyTotalRuns, "RemedySuccessCount", hc.Status.RemedySuccessCount, "RemedyFailedCount", hc.Status.RemedyFailedCount)
+					} else {
+						log.Info("RemedyRunsLimit and  RemedyResetInterval are not set")
+						err := r.processRemedyWorkflow(ctx, log, wfNamespace, hc)
+						if err != nil {
+							log.Error(err, "Error  executing RemedyWorkflow")
+							return err
 						}
-					}
-					err := r.processRemedyWorkflow(ctx, log, wfNamespace, hc)
-					if err != nil {
-						log.Error(err, "Error  executing RemedyWorkflow")
-						return err
 					}
 				}
 				break
@@ -746,14 +775,13 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 	type PodGCStrategy string
 	// PodGC describes how to delete completed pods as they complete
 	type PodGC struct {
-	// Strategy is the strategy to use. One of "OnPodCompletion", "OnPodSuccess", "OnWorkflowCompletion", "OnWorkflowSuccess"
-	Strategy      PodGCStrategy `json:"strategy,omitempty" protobuf:"bytes,1,opt,name=strategy,casttype=PodGCStrategy"`
-}
+		// Strategy is the strategy to use. One of "OnPodCompletion", "OnPodSuccess", "OnWorkflowCompletion", "OnWorkflowSuccess"
+		Strategy PodGCStrategy `json:"strategy,omitempty" protobuf:"bytes,1,opt,name=strategy,casttype=PodGCStrategy"`
+	}
 	pgc := PodGC{
 		Strategy: PodGCOnPodCompletion,
 	}
 	if podGC := data["spec"].(map[string]interface{})["podGC"]; podGC == nil {
-		log.Info("PodGC is nil")
 		data["spec"].(map[string]interface{})["podGC"] = &pgc
 	}
 	// make sure workflows by default get cleaned up
@@ -856,13 +884,12 @@ func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logg
 	// PodGC describes how to delete completed pods as they complete
 	type PodGC struct {
 		// Strategy is the strategy to use. One of "OnPodCompletion", "OnPodSuccess", "OnWorkflowCompletion", "OnWorkflowSuccess"
-		Strategy      PodGCStrategy `json:"strategy,omitempty" protobuf:"bytes,1,opt,name=strategy,casttype=PodGCStrategy"`
+		Strategy PodGCStrategy `json:"strategy,omitempty" protobuf:"bytes,1,opt,name=strategy,casttype=PodGCStrategy"`
 	}
 	pgc := PodGC{
 		Strategy: PodGCOnPodCompletion,
 	}
 	if podGC := data["spec"].(map[string]interface{})["podGC"]; podGC == nil {
-		log.Info("PodGC is nil")
 		data["spec"].(map[string]interface{})["podGC"] = &pgc
 	}
 	// make sure workflows by default get cleaned up
@@ -1025,7 +1052,7 @@ func (r *HealthCheckReconciler) createNameSpaceRole(clientset kubernetes.Interfa
 			{
 				APIGroups: []string{"*"},
 				Resources: []string{"*"},
-				Verbs:     []string{"get", "list", "watch"},
+				Verbs:     []string{"get", "list", "watch", "patch"},
 			},
 		},
 	})
