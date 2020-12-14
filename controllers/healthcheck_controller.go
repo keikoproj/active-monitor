@@ -1052,7 +1052,7 @@ func (r *HealthCheckReconciler) createNameSpaceRole(clientset kubernetes.Interfa
 			{
 				APIGroups: []string{"*"},
 				Resources: []string{"*"},
-				Verbs:     []string{"get", "list", "watch", "patch"},
+				Verbs:     []string{"get", "list", "watch"},
 			},
 		},
 	})
