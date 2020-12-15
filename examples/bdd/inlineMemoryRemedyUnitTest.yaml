@@ -7,6 +7,8 @@ metadata:
 spec:
   repeatAfterSec: 5 # duration in seconds
   level: cluster
+  remedyRunsLimit: 2
+  remedyResetInterval: 300
   workflow:
     generateName: fail-workflow-
     resource:
