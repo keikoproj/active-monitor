@@ -81,7 +81,7 @@ var (
 type HealthCheckReconciler struct {
 	client.Client
 	DynClient          dynamic.Interface
-	Recorder    	   record.EventRecorder
+	Recorder           record.EventRecorder
 	kubeclient         *kubernetes.Clientset
 	Log                logr.Logger
 	MaxParallel        int
@@ -101,6 +101,7 @@ func NewHealthCheckReconciler(mgr manager.Manager, log logr.Logger, MaxParallel 
 	return &HealthCheckReconciler{
 		Client:      mgr.GetClient(),
 		DynClient:   dynamic.NewForConfigOrDie(mgr.GetConfig()),
+		Recorder:    mgr.GetEventRecorderFor("HealthCheck"),
 		kubeclient:  kubernetes.NewForConfigOrDie(mgr.GetConfig()),
 		Log:         log,
 		MaxParallel: MaxParallel,
@@ -248,8 +249,8 @@ func (r *HealthCheckReconciler) createRBACForWorkflow(log logr.Logger, hc *activ
 			amnsRemedyRoleBinding = remedySa + "-ns-role-binding"
 			wfRemedyNamespace = hc.Spec.RemedyWorkflow.Resource.Namespace
 		} else {
-			return errors.New("ServiceAccount for the RemedyWorkflow is not specified")
 			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "ServiceAccount for the RemedyWorkflow is not specified")
+			return errors.New("ServiceAccount for the RemedyWorkflow is not specified")
 		}
 	}
 
@@ -282,8 +283,7 @@ func (r *HealthCheckReconciler) createRBACForWorkflow(log logr.Logger, hc *activ
 				return err
 			}
 			log.Info("Successfully Created", "ClusterRole", clusrole)
-			r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Created clusrole")
-
+			r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Created clusterrole")
 
 			crb, err := r.createClusterRoleBinding(r.kubeclient, amclusterRoleBinding, amclusterRole, hcSa, wfNamespace)
 			if err != nil {
@@ -358,8 +358,8 @@ func (r *HealthCheckReconciler) createRBACForWorkflow(log logr.Logger, hc *activ
 		}
 
 	} else {
-		return errors.New("level is not set")
 		r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "level is not set")
+		return errors.New("level is not set")
 	}
 
 	return nil
@@ -395,7 +395,6 @@ func (r *HealthCheckReconciler) deleteRBACForWorkflow(log logr.Logger, hc *activ
 		log.Info("Successfully Deleted", "ClusterRole", amclusterRemedyRole)
 		r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully deleted ClusterRole")
 
-
 		err = r.DeleteClusterRoleBinding(r.kubeclient, amclusterRoleRemedyBinding, amclusterRemedyRole, remedySa, wfRemedyNamespace)
 		if err != nil {
 			log.Error(err, "Error deleting ClusterRoleBinding for the workflow")
@@ -416,7 +415,6 @@ func (r *HealthCheckReconciler) deleteRBACForWorkflow(log logr.Logger, hc *activ
 		log.Info("Successfully deleted", "NamespaceRole", amnsRemedyRole)
 		r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully deleted NamespaceRole")
 
-
 		err = r.DeleteNameSpaceRoleBinding(r.kubeclient, amnsRemedyRoleBinding, amnsRemedyRole, remedySa, wfRemedyNamespace)
 		if err != nil {
 			log.Error(err, "Error deleting NamespaceRoleBinding for the workflow")
@@ -425,7 +423,6 @@ func (r *HealthCheckReconciler) deleteRBACForWorkflow(log logr.Logger, hc *activ
 		}
 		log.Info("Successfully Deleted", "NamespaceRoleBinding", amnsRemedyRoleBinding)
 		r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully deleted NamespaceRoleBinding")
-
 
 	} else {
 		err := errors.New("level is not set")
