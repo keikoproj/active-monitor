@@ -19,6 +19,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"time"
@@ -80,6 +81,7 @@ var (
 type HealthCheckReconciler struct {
 	client.Client
 	DynClient          dynamic.Interface
+	Recorder    	   record.EventRecorder
 	kubeclient         *kubernetes.Clientset
 	Log                logr.Logger
 	MaxParallel        int
@@ -128,6 +130,7 @@ func (r *HealthCheckReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 		// stop timer corresponding to next schedule run of workflow since parent healthcheck no longer exists
 		if r.RepeatTimersByName[req.NamespacedName.Name] != nil {
 			log.Info("Cancelling rescheduled workflow for this healthcheck due to deletion")
+			r.Recorder.Event(healthCheck, v1.EventTypeNormal, "Normal", "Cancelling workflow for this healthcheck due to deletion")
 			r.RepeatTimersByName[req.NamespacedName.Name].Stop()
 		}
 		return ctrl.Result{}, ignoreNotFound(err)
@@ -148,6 +151,7 @@ func (r *HealthCheckReconciler) processOrRecoverHealthCheck(ctx context.Context,
 	err := r.Update(ctx, healthCheck)
 	if err != nil {
 		log.Error(err, "Error updating healthcheck resource")
+		r.Recorder.Event(healthCheck, v1.EventTypeWarning, "Warning", "Error updating healthcheck resource")
 		// Force retry when status fails to update
 		return ctrl.Result{}, err
 	}
@@ -171,12 +175,14 @@ func (r *HealthCheckReconciler) processHealthCheck(ctx context.Context, log logr
 			healthCheck.Status.Status = "Stopped"
 			healthCheck.Status.ErrorMessage = fmt.Sprintf("workflow execution is stopped; either spec.RepeatAfterSec or spec.Schedule must be provided. spec.RepeatAfterSec set to %d. spec.Schedule set to %+v", hcSpec.RepeatAfterSec, hcSpec.Schedule)
 			healthCheck.Status.FinishedAt = &now
+			r.Recorder.Event(healthCheck, v1.EventTypeWarning, "Warning", "Workflow execution is stopped; either spec.RepeatAfterSec or spec.Schedule must be provided")
 			return ctrl.Result{}, nil
 		} else if hcSpec.RepeatAfterSec <= 0 && hcSpec.Schedule.Cron != "" {
 			log.Info("Workflow to be set with Schedule", "Cron", hcSpec.Schedule.Cron)
 			schedule, err := cron.ParseStandard(hcSpec.Schedule.Cron)
 			if err != nil {
 				log.Error(err, "fail to parse cron")
+				r.Recorder.Event(healthCheck, v1.EventTypeWarning, "Warning", "Fail to parse cron")
 			}
 			// The value from schedule next and substracting from current time is in fraction as we convert to int it will be 1 less than
 			// the intended reschedule so we need to add 1sec to get the actual value
@@ -191,6 +197,7 @@ func (r *HealthCheckReconciler) processHealthCheck(ctx context.Context, log logr
 		err := r.createRBACForWorkflow(log, healthCheck, hcKind)
 		if err != nil {
 			log.Error(err, "Error creating RBAC for HealthCheckWorkflow")
+			r.Recorder.Event(healthCheck, v1.EventTypeWarning, "Warning", "Error creating RBAC for HealthCheckWorkflow")
 			return ctrl.Result{}, err
 		}
 
@@ -198,11 +205,13 @@ func (r *HealthCheckReconciler) processHealthCheck(ctx context.Context, log logr
 		generatedWfName, err := r.createSubmitWorkflow(ctx, log, healthCheck)
 		if err != nil {
 			log.Error(err, "Error creating or submitting workflow")
+			r.Recorder.Event(healthCheck, v1.EventTypeWarning, "Warning", "Error creating or submitting workflow")
 			return ctrl.Result{}, err
 		}
 		err = r.watchWorkflowReschedule(ctx, ctrl.Request{}, log, wfNamespace, generatedWfName, healthCheck)
 		if err != nil {
 			log.Error(err, "Error executing Workflow")
+			r.Recorder.Event(healthCheck, v1.EventTypeWarning, "Warning", "Error executing Workflow")
 			return ctrl.Result{}, err
 		}
 	}
@@ -240,6 +249,7 @@ func (r *HealthCheckReconciler) createRBACForWorkflow(log logr.Logger, hc *activ
 			wfRemedyNamespace = hc.Spec.RemedyWorkflow.Resource.Namespace
 		} else {
 			return errors.New("ServiceAccount for the RemedyWorkflow is not specified")
+			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "ServiceAccount for the RemedyWorkflow is not specified")
 		}
 	}
 
@@ -247,16 +257,20 @@ func (r *HealthCheckReconciler) createRBACForWorkflow(log logr.Logger, hc *activ
 		servacc, err := r.createServiceAccount(r.kubeclient, hcSa, wfNamespace)
 		if err != nil {
 			log.Error(err, "Error creating ServiceAccount for the workflow")
+			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error creating ServiceAccount for the workflow")
 			return err
 		}
 		log.Info("Successfully Created", "ServiceAccount", servacc)
+		r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Created ServiceAccount")
 	} else {
 		servacc1, err := r.createServiceAccount(r.kubeclient, remedySa, wfRemedyNamespace)
 		if err != nil {
 			log.Error(err, "Error creating ServiceAccount for the workflow")
+			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error creating ServiceAccount for the workflow")
 			return err
 		}
 		log.Info("Successfully Created", "ServiceAccount", servacc1)
+		r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Created ServiceAccount")
 	}
 	if level == healthCheckClusterLevel {
 
@@ -264,31 +278,40 @@ func (r *HealthCheckReconciler) createRBACForWorkflow(log logr.Logger, hc *activ
 			clusrole, err := r.createClusterRole(r.kubeclient, amclusterRole)
 			if err != nil {
 				log.Error(err, "Error creating ClusterRole for the healthcheck workflow")
+				r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error creating ClusterRole for the healthcheck workflow")
 				return err
 			}
 			log.Info("Successfully Created", "ClusterRole", clusrole)
+			r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Created clusrole")
+
 
 			crb, err := r.createClusterRoleBinding(r.kubeclient, amclusterRoleBinding, amclusterRole, hcSa, wfNamespace)
 			if err != nil {
 				log.Error(err, "Error creating ClusterRoleBinding for the workflow")
+				r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error creating ClusterRoleBinding for the workflow")
 				return err
 			}
 			log.Info("Successfully Created", "ClusterRoleBinding", crb)
+			r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Created ClusterRoleBinding")
 
 		} else {
 			clusrole1, err := r.createRemedyClusterRole(r.kubeclient, amclusterRemedyRole)
 			if err != nil {
 				log.Error(err, "Error creating ClusterRole for the remedy workflow")
+				r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error creating ClusterRole for the remedy workflow")
 				return err
 			}
 			log.Info("Successfully Created", "ClusterRole", clusrole1)
+			r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Created ClusterRole")
 
 			crb1, err := r.createClusterRoleBinding(r.kubeclient, amclusterRoleRemedyBinding, amclusterRemedyRole, remedySa, wfRemedyNamespace)
 			if err != nil {
 				log.Error(err, "Error creating ClusterRoleBinding for the workflow")
+				r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error creating ClusterRoleBinding for the remedy workflow")
 				return err
 			}
 			log.Info("Successfully Created", "ClusterRoleBinding", crb1)
+			r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Created ClusterRoleBinding")
 
 		}
 
@@ -298,36 +321,45 @@ func (r *HealthCheckReconciler) createRBACForWorkflow(log logr.Logger, hc *activ
 			nsRole, err := r.createNameSpaceRole(r.kubeclient, amnsRole, wfNamespace)
 			if err != nil {
 				log.Error(err, "Error creating NamespaceRole for the workflow")
+				r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error creating NamespaceRole for the workflow")
 				return err
 			}
 			log.Info("Successfully Created", "NamespaceRole", nsRole)
+			r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Created NamespaceRole")
 
 			nsrb, err := r.createNameSpaceRoleBinding(r.kubeclient, amnsRoleBinding, amnsRole, hcSa, wfNamespace)
 			if err != nil {
 				log.Error(err, "Error creating NamespaceRoleBinding for the workflow")
+				r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error creating NamespaceRoleBinding for the workflow")
 				return err
 			}
 			log.Info("Successfully Created", "NamespaceRoleBinding", nsrb)
+			r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Created NamespaceRoleBinding")
 
 		} else {
 			nsRole1, err := r.createRemedyNameSpaceRole(r.kubeclient, amnsRemedyRole, wfRemedyNamespace)
 			if err != nil {
 				log.Error(err, "Error creating NamespaceRole for the workflow")
+				r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error creating NamespaceRole for the workflow")
 				return err
 			}
 			log.Info("Successfully Created", "NamespaceRole", nsRole1)
+			r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Created NamespaceRole")
 
 			nsrb1, err := r.createNameSpaceRoleBinding(r.kubeclient, amnsRemedyRoleBinding, amnsRemedyRole, remedySa, wfRemedyNamespace)
 			if err != nil {
 				log.Error(err, "Error creating NamespaceRoleBinding for the workflow")
+				r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error creating NamespaceRoleBinding for the workflow")
 				return err
 			}
 			log.Info("Successfully Created", "NamespaceRoleBinding", nsrb1)
+			r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Created NamespaceRoleBinding")
 
 		}
 
 	} else {
 		return errors.New("level is not set")
+		r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "level is not set")
 	}
 
 	return nil
@@ -346,44 +378,58 @@ func (r *HealthCheckReconciler) deleteRBACForWorkflow(log logr.Logger, hc *activ
 	err := r.DeleteServiceAccount(r.kubeclient, remedySa, wfRemedyNamespace)
 	if err != nil {
 		log.Error(err, "Error deleting ServiceAccount for the workflow")
+		r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error deleting ServiceAccount for the workflow")
 		return err
 	}
 	log.Info("Successfully Deleted", "ServiceAccount", remedySa)
+	r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Deleted ServiceAccount")
 
 	if level == "cluster" {
 
 		err = r.DeleteClusterRole(r.kubeclient, amclusterRemedyRole)
 		if err != nil {
-			log.Error(err, "Error creating ClusterRole for the workflow")
+			log.Error(err, "Error deleting ClusterRole for the workflow")
+			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error deleting ClusterRole for the workflow")
 			return err
 		}
 		log.Info("Successfully Deleted", "ClusterRole", amclusterRemedyRole)
+		r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully deleted ClusterRole")
+
 
 		err = r.DeleteClusterRoleBinding(r.kubeclient, amclusterRoleRemedyBinding, amclusterRemedyRole, remedySa, wfRemedyNamespace)
 		if err != nil {
-			log.Error(err, "Error creating ClusterRoleBinding for the workflow")
+			log.Error(err, "Error deleting ClusterRoleBinding for the workflow")
+			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error creating ClusterRoleBinding for the workflow")
 			return err
 		}
 		log.Info("Successfully Deleted", "ClusterRoleBinding", amclusterRoleRemedyBinding)
+		r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully deleted ClusterRoleBinding")
 
 	} else if level == "namespace" {
 
 		err := r.DeleteNameSpaceRole(r.kubeclient, amnsRemedyRole, wfRemedyNamespace)
 		if err != nil {
-			log.Error(err, "Error creating NamespaceRole for the workflow")
+			log.Error(err, "Error deleting NamespaceRole for the workflow")
+			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error deleting NamespaceRole for the workflow")
 			return err
 		}
-		log.Info("Successfully Deleted", "NamespaceRole", amnsRemedyRole)
+		log.Info("Successfully deleted", "NamespaceRole", amnsRemedyRole)
+		r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully deleted NamespaceRole")
+
 
 		err = r.DeleteNameSpaceRoleBinding(r.kubeclient, amnsRemedyRoleBinding, amnsRemedyRole, remedySa, wfRemedyNamespace)
 		if err != nil {
-			log.Error(err, "Error creating NamespaceRoleBinding for the workflow")
+			log.Error(err, "Error deleting NamespaceRoleBinding for the workflow")
+			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error deleting NamespaceRole for the workflow")
 			return err
 		}
 		log.Info("Successfully Deleted", "NamespaceRoleBinding", amnsRemedyRoleBinding)
+		r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully deleted NamespaceRoleBinding")
+
 
 	} else {
 		err := errors.New("level is not set")
+		r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "level is not set")
 		return err
 	}
 
@@ -399,10 +445,12 @@ func (r *HealthCheckReconciler) createSubmitWorkflowHelper(ctx context.Context, 
 		wfName, err := r.createSubmitWorkflow(ctx, log, hc)
 		if err != nil {
 			log.Error(err, "Error creating or submitting workflow")
+			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error creating or submitting workflow")
 		}
 		err = r.watchWorkflowReschedule(ctx, ctrl.Request{}, log, wfNamespace, wfName, hc)
 		if err != nil {
 			log.Error(err, "Error watching or rescheduling workflow")
+			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error watching or rescheduling workflow")
 		}
 	}
 }
@@ -435,6 +483,7 @@ func (r *HealthCheckReconciler) createSubmitWorkflow(ctx context.Context, log lo
 	}
 	generatedName := workflow.GetName()
 	log.Info("Created workflow", "generatedName", generatedName)
+	r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully created workflow")
 	return generatedName, nil
 }
 
@@ -467,6 +516,7 @@ func (r *HealthCheckReconciler) createSubmitRemedyWorkflow(ctx context.Context, 
 	}
 	generatedName := remedyWorkflow.GetName()
 	log.Info("Created remedyWorkflow", "generatedName", generatedName)
+	r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully created remedyWorkflow")
 	return generatedName, nil
 }
 
@@ -501,10 +551,12 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 			status, ok = map[string]interface{}{"phase": failStr, "message": failStr}, true
 			log.Error(err1, "iebackoff err message")
 			log.Info("status of workflow is updated to Failed", "status:", status)
+			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Workflow timed out")
 		}
 		if ok {
 			log.Info("Workflow status", "status", status["phase"])
 			if status["phase"] == succStr {
+				r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Workflow status is Succeeded")
 				hc.Status.Status = succStr
 				hc.Status.StartedAt = &then
 				hc.Status.FinishedAt = &now
@@ -527,9 +579,11 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 					hc.Status.RemedyLastFailedAt = nil
 					hc.Status.RemedyStatus = "HealthCheck Passed so Remedy is reset"
 					log.Info("HealthCheck passed so Remedy is reset", "RemedyTotalRuns:", hc.Status.RemedyTotalRuns, "RemedySuccessCount", hc.Status.RemedySuccessCount, "RemedyFailedCount", hc.Status.RemedyFailedCount)
+					r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "HealthCheck passed so Remedy is reset")
 				}
 				break
 			} else if status["phase"] == failStr {
+				r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Workflow status is Failed")
 				hc.Status.Status = failStr
 				hc.Status.StartedAt = &then
 				hc.Status.FinishedAt = &now
@@ -550,7 +604,8 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 							log.Info("RemedyRunsLimit is greater than  RemedyTotalRuns", "RemedyRunsLimit", hc.Spec.RemedyRunsLimit, "RemedyTotalRuns", hc.Status.RemedyTotalRuns)
 							err := r.processRemedyWorkflow(ctx, log, wfNamespace, hc)
 							if err != nil {
-								log.Error(err, "Error  executing RemedyWorkflow")
+								log.Error(err, "Error executing RemedyWorkflow")
+								r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error executing RemedyWorkflow")
 								return err
 							}
 						} else {
@@ -567,18 +622,21 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 								hc.Status.RemedyLastFailedAt = nil
 								hc.Status.RemedyStatus = "RemedyResetInterval elapsed so Remedy is reset"
 								log.Info("RemedyResetInterval elapsed so Remedy is reset", "RemedyTotalRuns:", hc.Status.RemedyTotalRuns, "RemedySuccessCount", hc.Status.RemedySuccessCount, "RemedyFailedCount", hc.Status.RemedyFailedCount)
+								r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "RemedyResetInterval elapsed so Remedy is reset")
 								err := r.processRemedyWorkflow(ctx, log, wfNamespace, hc)
 								if err != nil {
 									log.Error(err, "Error  executing RemedyWorkflow")
+									r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error executing RemedyWorkflow")
 									return err
 								}
 							}
 						}
 					} else {
-						log.Info("RemedyRunsLimit and  RemedyResetInterval are not set")
+						log.Info("RemedyRunsLimit and RemedyResetInterval are not set")
 						err := r.processRemedyWorkflow(ctx, log, wfNamespace, hc)
 						if err != nil {
-							log.Error(err, "Error  executing RemedyWorkflow")
+							log.Error(err, "Error executing RemedyWorkflow")
+							r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error executing RemedyWorkflow")
 							return err
 						}
 					}
@@ -596,36 +654,42 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 		err := r.Update(ctx, hc)
 		if err != nil {
 			log.Error(err, "Error updating healthcheck resource")
+			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error updating healthcheck resource")
 		}
 		// reschedule next run of workflow
 		helper := r.createSubmitWorkflowHelper(ctx, log, wfNamespace, hc)
 		r.RepeatTimersByName[hc.GetName()] = time.AfterFunc(time.Duration(repeatAfterSec)*time.Second, helper)
 		log.Info("Rescheduled workflow for next run", "namespace", wfNamespace, "name", wfName)
+		r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Rescheduled workflow for next run")
 	}
 	return nil
 }
 
 func (r *HealthCheckReconciler) processRemedyWorkflow(ctx context.Context, log logr.Logger, wfNamespace string, hc *activemonitorv1alpha1.HealthCheck) error {
 
-	log.Info("Creating Workflow", "namespace", wfNamespace, "generateNamePrefix", hc.Spec.RemedyWorkflow.GenerateName)
+	log.Info("Creating Remedy Workflow", "namespace", wfNamespace, "generateNamePrefix", hc.Spec.RemedyWorkflow.GenerateName)
 	err := r.createRBACForWorkflow(log, hc, remedy)
 	if err != nil {
 		log.Error(err, "Error creating RBAC Permissions for Remedy Workflow")
+		r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error creating RBAC Permissions for Remedy Workflow")
 		return err
 	}
 	generatedWfName, err := r.createSubmitRemedyWorkflow(ctx, log, hc)
 	if err != nil {
 		log.Error(err, "Error creating or submitting remedyworkflow")
+		r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error creating or submitting remedyworkflow")
 		return err
 	}
 	err = r.watchRemedyWorkflow(ctx, ctrl.Request{}, log, wfNamespace, generatedWfName, hc)
 	if err != nil {
 		log.Error(err, "Error in  watchRemedyWorkflow of remedy workflow")
+		r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error in  watchRemedyWorkflow of remedy workflow")
 		return err
 	}
 	err = r.deleteRBACForWorkflow(log, hc)
 	if err != nil {
-		log.Error(err, "Error deleting  RBAC of remedy workflow")
+		log.Error(err, "Error deleting RBAC of remedy workflow")
+		r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error deleting RBAC of remedy workflow")
 		return err
 	}
 	return nil
@@ -655,15 +719,17 @@ func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctr
 			return ignoreNotFound(err)
 		}
 		status, ok := workflow.UnstructuredContent()["status"].(map[string]interface{})
-		log.Info("status of workflow", "status:", status, "ok:", ok)
+		log.Info("status of remedy workflow", "status:", status, "ok:", ok)
 		if err1 != nil {
 			status, ok = map[string]interface{}{"phase": failStr, "message": failStr}, true
 			log.Error(err1, "iebackoff err message")
-			log.Info("status of workflow is updated to Failed", "status:", status)
+			log.Info("status of remedy workflow is updated to Failed", "status:", status)
+			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "remedy workflow is timedout")
 		}
 		if ok {
-			log.Info("Workflow status", "status", status["phase"])
+			log.Info("Remedy workflow status", "status", status["phase"])
 			if status["phase"] == succStr {
+				r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Remedy workflow status is Succceeded")
 				hc.Status.RemedyStatus = succStr
 				hc.Status.RemedyStartedAt = &then
 				hc.Status.RemedyFinishedAt = &now
@@ -678,6 +744,7 @@ func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctr
 				metrics.MonitorFinishedTime.With(prometheus.Labels{"healthcheck_name": hc.GetName(), "workflow": remedy}).Set(float64(hc.Status.FinishedAt.Unix()))
 				break
 			} else if status["phase"] == failStr {
+				r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "remedy workflow status is failed")
 				hc.Status.RemedyStatus = failStr
 				hc.Status.RemedyStartedAt = &then
 				hc.Status.RemedyFinishedAt = &now
@@ -702,6 +769,7 @@ func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctr
 		err := r.Update(ctx, hc)
 		if err != nil {
 			log.Error(err, "Error updating healthcheck resource")
+			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error updating healthcheck resource")
 		}
 	}
 
@@ -715,17 +783,20 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 		reader, err := store.GetArtifactReader(&hc.Spec.Workflow.Resource.Source)
 		if err != nil {
 			log.Error(err, "Failed to get artifact reader")
+			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Failed to get artifact reader for workflow")
 			return err
 		}
 		wfContent, err = reader.Read()
 		if err != nil {
 			log.Error(err, "Failed to read content")
+			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Failed to read content for workflow")
 			return err
 		}
 	}
 	// load workflow spec into data obj
 	if err := yaml.Unmarshal(wfContent, &data); err != nil {
 		log.Error(err, "Invalid spec file passed")
+		r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Invalid spec file passed")
 		return err
 	}
 
@@ -809,10 +880,12 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 	if !ok {
 		err := errors.New("invalid workflow, missing spec")
 		log.Error(err, "Invalid workflow template spec")
+		r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Invalid workflow template spec")
 		return err
 	}
 	content["spec"] = spec
 	uwf.SetUnstructuredContent(content)
+	r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "workflow is parsed from healthcheck")
 	return nil
 }
 
@@ -913,12 +986,14 @@ func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logg
 
 	spec, ok := data["spec"]
 	if !ok {
-		err := errors.New("Invalid workflow, missing spec")
-		log.Error(err, "Invalid workflow template spec")
+		err := errors.New("Invalid remedy workflow, missing spec")
+		log.Error(err, "Invalid remedy workflow template spec")
+		r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Invalid remedy workflow template spec")
 		return err
 	}
 	content["spec"] = spec
 	uwf.SetUnstructuredContent(content)
+	r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Remedy workflow is parsed from healthcheck")
 	return nil
 }
 
