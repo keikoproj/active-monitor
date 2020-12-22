@@ -113,9 +113,7 @@ func NewHealthCheckReconciler(mgr manager.Manager, log logr.Logger, MaxParallel 
 func (r *HealthCheckReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 	log := r.Log.WithValues(hcKind, req.NamespacedName)
-
 	log.Info("Starting HealthCheck reconcile for ...")
-
 	// initialize timers map if not already done
 	if r.RepeatTimersByName == nil {
 		r.RepeatTimersByName = make(map[string]*time.Timer)
@@ -730,14 +728,13 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 	type PodGCStrategy string
 	// PodGC describes how to delete completed pods as they complete
 	type PodGC struct {
-	// Strategy is the strategy to use. One of "OnPodCompletion", "OnPodSuccess", "OnWorkflowCompletion", "OnWorkflowSuccess"
-	Strategy      PodGCStrategy `json:"strategy,omitempty" protobuf:"bytes,1,opt,name=strategy,casttype=PodGCStrategy"`
-}
+		// Strategy is the strategy to use. One of "OnPodCompletion", "OnPodSuccess", "OnWorkflowCompletion", "OnWorkflowSuccess"
+		Strategy PodGCStrategy `json:"strategy,omitempty" protobuf:"bytes,1,opt,name=strategy,casttype=PodGCStrategy"`
+	}
 	pgc := PodGC{
 		Strategy: PodGCOnPodCompletion,
 	}
 	if podGC := data["spec"].(map[string]interface{})["podGC"]; podGC == nil {
-		log.Info("PodGC is nil")
 		data["spec"].(map[string]interface{})["podGC"] = &pgc
 	}
 	// make sure workflows by default get cleaned up
