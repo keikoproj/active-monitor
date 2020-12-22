@@ -28,12 +28,14 @@ import (
 // HealthCheckSpec defines the desired state of HealthCheck
 // Either RepeatAfterSec or Schedule must be defined for the health check to run
 type HealthCheckSpec struct {
-	RepeatAfterSec int            `json:"repeatAfterSec,omitempty"`
-	Description    string         `json:"description,omitempty"`
-	Workflow       Workflow       `json:"workflow"`
-	Level          string         `json:"level,omitempty"`    // defines if a workflow runs in a Namespace or Cluster level
-	Schedule       ScheduleSpec   `json:"schedule,omitempty"` // Schedule defines schedule rules to run HealthCheck
-	RemedyWorkflow RemedyWorkflow `json:"remedyworkflow,omitempty"`
+	RepeatAfterSec      int            `json:"repeatAfterSec,omitempty"`
+	Description         string         `json:"description,omitempty"`
+	Workflow            Workflow       `json:"workflow"`
+	Level               string         `json:"level,omitempty"`    // defines if a workflow runs in a Namespace or Cluster level
+	Schedule            ScheduleSpec   `json:"schedule,omitempty"` // Schedule defines schedule rules to run HealthCheck
+	RemedyWorkflow      RemedyWorkflow `json:"remedyworkflow,omitempty"`
+	RemedyRunsLimit     int            `json:"remedyRunsLimit,omitempty"`
+	RemedyResetInterval int            `json:"remedyResetInterval,omitempty"`
 }
 
 // HealthCheckStatus defines the observed state of HealthCheck

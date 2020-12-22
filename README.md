@@ -21,6 +21,10 @@ The HealthCheck workflow is run periodically, as defined by `repeatAfterSec` or 
 
 Active-Monitor sets the status of the HealthCheck CR to indicate whether the monitoring check succeeded or failed. If in case the monitoring check failed then the Remedy workflow will execute to fix the issue. Status of Remedy will be updated in the CR. External systems can query these CRs and take appropriate action if they failed.
 
+RemedyRunsLimit parameter allows to configure how many times a remedy should be run. If Remedy action fails for any reason it will stop on further retries. It is an optional parameter. If it is not set Remedyworkflow is triggered whenever HealthCheck workflow fails.
+
+RemedyResetInterval parameter allows resetting remedy after the reset interval time and RemedyWorkflow can be retried again in case monitor workflow fails. If remedy reaches a RemedyRunsLimit it will be reset when HealthCheck passes in any subsequent run before RemedyResetInterval. 
+
 Typical examples of such workflows include tests for basic Kubernetes object creation/deletion, tests for cluster-wide services such as policy engines checks, authentication and authorization checks, etc.
 
 The sort of HealthChecks one could run with Active-Monitor are:
