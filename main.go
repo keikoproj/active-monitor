@@ -70,6 +70,7 @@ func main() {
 	err = (&controllers.HealthCheckReconciler{
 		Client:      mgr.GetClient(),
 		DynClient:   dynClient,
+		Recorder:    mgr.GetEventRecorderFor("HealthCheck"),
 		Log:         ctrl.Log.WithName("controllers").WithName("HealthCheck"),
 		MaxParallel: maxParallel,
 	}).SetupWithManager(mgr)
