@@ -114,6 +114,7 @@ func (r *HealthCheckReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 	ctx := context.Background()
 	log := r.Log.WithValues(hcKind, req.NamespacedName)
 	log.Info("Starting HealthCheck reconcile for ...")
+
 	// initialize timers map if not already done
 	if r.RepeatTimersByName == nil {
 		r.RepeatTimersByName = make(map[string]*time.Timer)
@@ -956,7 +957,6 @@ func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logg
 		Strategy: PodGCOnPodCompletion,
 	}
 	if podGC := data["spec"].(map[string]interface{})["podGC"]; podGC == nil {
-		log.Info("PodGC is nil")
 		data["spec"].(map[string]interface{})["podGC"] = &pgc
 	}
 	// make sure workflows by default get cleaned up
