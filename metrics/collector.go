@@ -2,15 +2,16 @@ package metrics
 
 import (
 	"encoding/json"
-	"strings"
-
 	wfv1 "github.com/argoproj/argo/pkg/apis/workflow/v1alpha1"
 	"github.com/mitchellh/mapstructure"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
+	"strings"
 )
 
 var hcName = "healthcheck_name"
+var wf = "workflow"
 
 // MonitorProcessed will be used to track the number of processed events
 var (
@@ -18,31 +19,31 @@ var (
 		Name: "healthcheck_success_count",
 		Help: "The total number of successful healthcheck resources",
 	},
-		[]string{hcName},
+		[]string{hcName, wf},
 	)
 	MonitorError = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "healthcheck_error_count",
 		Help: "The total number of errored healthcheck resources",
 	},
-		[]string{hcName},
+		[]string{hcName, wf},
 	)
 	MonitorRuntime = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "healthcheck_runtime_seconds",
 		Help: "Time taken for the workflow to complete.",
 	},
-		[]string{hcName},
+		[]string{hcName, wf},
 	)
 	MonitorStartedTime = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "healthcheck_starttime",
 		Help: "Time taken for the workflow to complete.",
 	},
-		[]string{hcName},
+		[]string{hcName, wf},
 	)
 	MonitorFinishedTime = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Name: "healthcheck_finishedtime",
 		Help: "Time taken for the workflow to complete.",
 	},
-		[]string{hcName},
+		[]string{hcName, wf},
 	)
 
 	CustomGaugeMetricsMap = make(map[string]*prometheus.GaugeVec)
@@ -56,17 +57,9 @@ type customMetricMap struct {
 	Value      float64
 }
 
-// NewRegistry is a custom registry for metrics
-func NewRegistry() *prometheus.Registry {
-	// Metrics have to be registered to be exposed:
-	promRegistry := prometheus.NewRegistry() // local Registry so we don't get Go metrics, etc.
-
-	promRegistry.MustRegister(MonitorSuccess)
-	promRegistry.MustRegister(MonitorError)
-	promRegistry.MustRegister(MonitorRuntime)
-	promRegistry.MustRegister(MonitorStartedTime)
-	promRegistry.MustRegister(MonitorFinishedTime)
-	return promRegistry
+func init() {
+	// Register custom metrics with the global prometheus registry
+	metrics.Registry.MustRegister(MonitorSuccess, MonitorError, MonitorRuntime, MonitorStartedTime, MonitorFinishedTime)
 }
 
 // CreateDynamicPrometheusMetric initializes and registers custom metrics dynamically

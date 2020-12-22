@@ -1,10 +1,13 @@
 apiVersion: activemonitor.keikoproj.io/v1alpha1
 kind: HealthCheck
 metadata:
-  generateName: inline-hello-
+  name: inline-hello
+#  generateName: inline-hello-
   namespace: health
 spec:
-  repeatAfterSec: 60 # duration in seconds
+#  repeatAfterSec: 60 # duration in seconds
+  schedule:
+    cron: "@every 1m"
   level: cluster
   workflow:
     generateName: inline-hello-
@@ -16,6 +19,8 @@ spec:
             apiVersion: argoproj.io/v1alpha1
             kind: Workflow
             metadata:
+              labels:
+                workflows.argoproj.io/controller-instanceid: activemonitor-workflows
               generateName: hello-world-
             spec:
               entrypoint: whalesay
