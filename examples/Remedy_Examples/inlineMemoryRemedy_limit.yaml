@@ -1,0 +1,57 @@
+apiVersion: activemonitor.keikoproj.io/v1alpha1
+kind: HealthCheck
+metadata:
+  generateName: fail-healthcheck-
+  namespace: health
+spec:
+  repeatAfterSec: 30 # duration in seconds
+  level: cluster
+  remedyRunsLimit: 2
+  remedyResetInterval: 300
+  workflow:
+    generateName: randomfail-workflow-
+    resource:
+      namespace: health # workflow will be submitted in this ns
+      serviceAccount: activemonitor-controller-sa # workflow will be submitted using this
+      source:
+        inline: |
+          apiVersion: argoproj.io/v1alpha1
+          kind: Workflow
+          metadata:
+            labels:
+              workflows.argoproj.io/controller-instanceid: activemonitor-workflows
+          spec:
+            ttlSecondsAfterFinished: 60
+            podGC:
+              strategy: OnWorkflowSuccess
+            entrypoint: start
+            templates:
+            - name: start
+              container:
+                image: docker/whalesay:latest
+                command: [/bin/bash, -c]
+                args: ["echo 'Running command';P=(1 0); exit ${P[RANDOM%2]};"]
+  remedyworkflow:
+    generateName: remedy-test-
+    resource:
+      namespace: health # workflow will be submitted in this ns
+      serviceAccount: activemonitor-remedy-sa # workflow will be submitted using this acct
+      source:
+        inline: |
+          apiVersion: argoproj.io/v1alpha1
+          kind: Workflow
+          metadata:
+            labels:
+              workflows.argoproj.io/controller-instanceid: activemonitor-workflows
+            generateName: hello-world-
+          spec:
+            entrypoint: whalesay
+            templates:
+              -
+                container:
+                  args:
+                    - "hello world"
+                  command:
+                    - cowsay
+                  image: "docker/whalesay:latest"
+                name: whalesay
