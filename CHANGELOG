@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 Bleeding-edge development, not yet released
 
+## [0.5.0] - 2020-12-23
+### Added
+- Exponentially reduce Kubernetes API calls- #64
+- Limit number of times the Self-Healing/Remedy should be run - #65
+- Enable default PodGC strategy as OnPodCompletion in workflow - #67
+- Add Events to Acive-Monitor Custom Resources - #70
+
 ## [0.4.0] - 2020-08-04
 ### Added
 - Consolidate Metric Endpoints for Active-Monitor - #7
@@ -36,7 +43,8 @@ Bleeding-edge development, not yet released
 ### Added
 - Initial commit of project
 
-[Unreleased]: https://github.com/keikoproj/active-monitor/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/keikoproj/active-monitor/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/keikoproj/active-monitor/releases/tag/v0.5.0
 [0.4.0]: https://github.com/keikoproj/active-monitor/releases/tag/v0.4.0
 [0.3.0]: https://github.com/keikoproj/active-monitor/releases/tag/v0.3.0
 [0.2.0]: https://github.com/keikoproj/active-monitor/releases/tag/v0.2.0
