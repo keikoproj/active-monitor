@@ -19,6 +19,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"time"
 
 	"github.com/ghodss/yaml"
@@ -145,7 +146,10 @@ func (r *HealthCheckReconciler) processOrRecoverHealthCheck(ctx context.Context,
 	}()
 	// Process HealthCheck
 	ret, procErr := r.processHealthCheck(ctx, log, healthCheck)
-
+	if procErr != nil {
+		log.Error(procErr, "Workflow for this healthcheck has an error")
+		return reconcile.Result{RequeueAfter: 1 * time.Second}, procErr
+	}
 	err := r.Update(ctx, healthCheck)
 	if err != nil {
 		log.Error(err, "Error updating healthcheck resource")
@@ -645,10 +649,16 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 	// see: https://book.kubebuilder.io/reference/using-finalizers.html
 	if hc.ObjectMeta.DeletionTimestamp.IsZero() {
 		// since the underlying workflow has completed, we update the healthcheck accordingly
-		err := r.Update(ctx, hc)
+		err := r.updateHealthCheckStatus(ctx, log, hc)
 		if err != nil {
 			log.Error(err, "Error updating healthcheck resource")
 			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error updating healthcheck resource")
+			if r.RepeatTimersByName[req.NamespacedName.Name] != nil {
+				log.Info("Cancelling rescheduled workflow for this healthcheck due to deletion")
+				r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Cancelling workflow for this healthcheck due to deletion")
+				r.RepeatTimersByName[hc.GetName()].Stop()
+			}
+			return err
 		}
 		// reschedule next run of workflow
 		helper := r.createSubmitWorkflowHelper(ctx, log, wfNamespace, hc)
@@ -760,10 +770,16 @@ func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctr
 	// see: https://book.kubebuilder.io/reference/using-finalizers.html
 	if hc.ObjectMeta.DeletionTimestamp.IsZero() {
 		// since the underlying workflow has completed, we update the healthcheck accordingly
-		err := r.Update(ctx, hc)
+		err := r.updateHealthCheckStatus(ctx, log, hc)
 		if err != nil {
 			log.Error(err, "Error updating healthcheck resource")
 			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error updating healthcheck resource")
+			if r.RepeatTimersByName[req.NamespacedName.Name] != nil {
+				log.Info("Cancelling rescheduled workflow for this healthcheck due to deletion")
+				r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Cancelling workflow for this healthcheck due to deletion")
+				r.RepeatTimersByName[hc.GetName()].Stop()
+			}
+			return err
 		}
 	}
 
@@ -1268,4 +1284,14 @@ func (r *HealthCheckReconciler) DeleteClusterRoleBinding(clientset kubernetes.In
 
 	return nil
 
+}
+
+func (r *HealthCheckReconciler) updateHealthCheckStatus(ctx context.Context, log logr.Logger, hc *activemonitorv1alpha1.HealthCheck) error {
+	if err := r.Status().Update(ctx, hc); err != nil {
+		log.Error(err, "HealthCheck status could not be updated.")
+		r.Recorder.Event(hc, "Warning", "Failed", fmt.Sprintf("HealthCheck %s/%s status could not be updated. %v", hc.Namespace, hc.Name, err))
+		return err
+	}
+
+	return nil
 }
