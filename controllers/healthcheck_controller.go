@@ -20,6 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"strings"
 	"time"
 
 	"github.com/ghodss/yaml"
@@ -148,12 +149,22 @@ func (r *HealthCheckReconciler) processOrRecoverHealthCheck(ctx context.Context,
 	ret, procErr := r.processHealthCheck(ctx, log, healthCheck)
 	if procErr != nil {
 		log.Error(procErr, "Workflow for this healthcheck has an error")
+		if r.IsStorageError(procErr) {
+			log.Error(procErr, "StorageError: invalid object")
+			return ctrl.Result{}, nil
+		}
 		return reconcile.Result{RequeueAfter: 1 * time.Second}, procErr
 	}
 	err := r.Update(ctx, healthCheck)
 	if err != nil {
 		log.Error(err, "Error updating healthcheck resource")
 		r.Recorder.Event(healthCheck, v1.EventTypeWarning, "Warning", "Error updating healthcheck resource")
+		// avoid update errors for already deleted resources
+		if r.IsStorageError(err) {
+			log.Error(err, "StorageError: invalid object")
+			return ctrl.Result{}, nil
+		}
+		log.Error(err, "failed to update custom resource")
 		// Force retry when status fails to update
 		return ctrl.Result{}, err
 	}
@@ -178,6 +189,12 @@ func (r *HealthCheckReconciler) processHealthCheck(ctx context.Context, log logr
 			healthCheck.Status.ErrorMessage = fmt.Sprintf("workflow execution is stopped; either spec.RepeatAfterSec or spec.Schedule must be provided. spec.RepeatAfterSec set to %d. spec.Schedule set to %+v", hcSpec.RepeatAfterSec, hcSpec.Schedule)
 			healthCheck.Status.FinishedAt = &now
 			r.Recorder.Event(healthCheck, v1.EventTypeWarning, "Warning", "Workflow execution is stopped; either spec.RepeatAfterSec or spec.Schedule must be provided")
+			err := r.updateHealthCheckStatus(ctx, log, healthCheck)
+			if err != nil {
+				log.Error(err, "Error updating healthcheck resource")
+				r.Recorder.Event(healthCheck, v1.EventTypeWarning, "Warning", "Error updating healthcheck resource")
+				return ctrl.Result{}, err
+			}
 			return ctrl.Result{}, nil
 		} else if hcSpec.RepeatAfterSec <= 0 && hcSpec.Schedule.Cron != "" {
 			log.Info("Workflow to be set with Schedule", "Cron", hcSpec.Schedule.Cron)
@@ -1294,4 +1311,30 @@ func (r *HealthCheckReconciler) updateHealthCheckStatus(ctx context.Context, log
 	}
 
 	return nil
+}
+
+// ContainsString returns true if a given slice 'slice' contains string 's', otherwise return false
+func (r *HealthCheckReconciler) ContainsString(slice []string, s string) bool {
+	for _, item := range slice {
+		if item == s {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *HealthCheckReconciler) IsStorageError(err error) bool {
+	if r.ContainsEqualFoldSubstring(err.Error(), "StorageError: invalid object") {
+		return true
+	}
+	return false
+}
+
+func (r *HealthCheckReconciler) ContainsEqualFoldSubstring(str, substr string) bool {
+	x := strings.ToLower(str)
+	y := strings.ToLower(substr)
+	if strings.Contains(x, y) {
+		return true
+	}
+	return false
 }
