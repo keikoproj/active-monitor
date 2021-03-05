@@ -178,6 +178,12 @@ func (r *HealthCheckReconciler) processHealthCheck(ctx context.Context, log logr
 			healthCheck.Status.ErrorMessage = fmt.Sprintf("workflow execution is stopped; either spec.RepeatAfterSec or spec.Schedule must be provided. spec.RepeatAfterSec set to %d. spec.Schedule set to %+v", hcSpec.RepeatAfterSec, hcSpec.Schedule)
 			healthCheck.Status.FinishedAt = &now
 			r.Recorder.Event(healthCheck, v1.EventTypeWarning, "Warning", "Workflow execution is stopped; either spec.RepeatAfterSec or spec.Schedule must be provided")
+			err := r.updateHealthCheckStatus(ctx, log, healthCheck)
+			if err != nil {
+				log.Error(err, "Error updating healthcheck resource")
+				r.Recorder.Event(healthCheck, v1.EventTypeWarning, "Warning", "Error updating healthcheck resource")
+				return ctrl.Result{}, err
+			}
 			return ctrl.Result{}, nil
 		} else if hcSpec.RepeatAfterSec <= 0 && hcSpec.Schedule.Cron != "" {
 			log.Info("Workflow to be set with Schedule", "Cron", hcSpec.Schedule.Cron)
