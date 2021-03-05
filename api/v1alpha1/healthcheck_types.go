@@ -61,6 +61,7 @@ type HealthCheckStatus struct {
 }
 
 // +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
 // +kubebuilder:resource:path=healthchecks,scope=Namespaced,shortName=hc;hcs
 // +kubebuilder:printcolumn:name="LATEST STATUS",type=string,JSONPath=`.status.status`
 // +kubebuilder:printcolumn:name="SUCCESS CNT  ",type=string,JSONPath=`.status.successCount`

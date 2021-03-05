@@ -19,6 +19,8 @@ import (
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"strings"
 	"time"
 
 	"github.com/ghodss/yaml"
@@ -145,7 +147,14 @@ func (r *HealthCheckReconciler) processOrRecoverHealthCheck(ctx context.Context,
 	}()
 	// Process HealthCheck
 	ret, procErr := r.processHealthCheck(ctx, log, healthCheck)
-
+	if procErr != nil {
+		log.Error(procErr, "Workflow for this healthcheck has an error")
+		if r.IsStorageError(procErr) {
+			// avoid update errors for resources already deleted
+			return ctrl.Result{}, nil
+		}
+		return reconcile.Result{RequeueAfter: 1 * time.Second}, procErr
+	}
 	err := r.Update(ctx, healthCheck)
 	if err != nil {
 		log.Error(err, "Error updating healthcheck resource")
@@ -174,6 +183,12 @@ func (r *HealthCheckReconciler) processHealthCheck(ctx context.Context, log logr
 			healthCheck.Status.ErrorMessage = fmt.Sprintf("workflow execution is stopped; either spec.RepeatAfterSec or spec.Schedule must be provided. spec.RepeatAfterSec set to %d. spec.Schedule set to %+v", hcSpec.RepeatAfterSec, hcSpec.Schedule)
 			healthCheck.Status.FinishedAt = &now
 			r.Recorder.Event(healthCheck, v1.EventTypeWarning, "Warning", "Workflow execution is stopped; either spec.RepeatAfterSec or spec.Schedule must be provided")
+			err := r.updateHealthCheckStatus(ctx, log, healthCheck)
+			if err != nil {
+				log.Error(err, "Error updating healthcheck resource")
+				r.Recorder.Event(healthCheck, v1.EventTypeWarning, "Warning", "Error updating healthcheck resource")
+				return ctrl.Result{}, err
+			}
 			return ctrl.Result{}, nil
 		} else if hcSpec.RepeatAfterSec <= 0 && hcSpec.Schedule.Cron != "" {
 			log.Info("Workflow to be set with Schedule", "Cron", hcSpec.Schedule.Cron)
@@ -645,10 +660,16 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 	// see: https://book.kubebuilder.io/reference/using-finalizers.html
 	if hc.ObjectMeta.DeletionTimestamp.IsZero() {
 		// since the underlying workflow has completed, we update the healthcheck accordingly
-		err := r.Update(ctx, hc)
+		err := r.updateHealthCheckStatus(ctx, log, hc)
 		if err != nil {
 			log.Error(err, "Error updating healthcheck resource")
 			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error updating healthcheck resource")
+			if r.RepeatTimersByName[req.NamespacedName.Name] != nil {
+				log.Info("Cancelling rescheduled workflow for this healthcheck due to deletion")
+				r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Cancelling workflow for this healthcheck due to deletion")
+				r.RepeatTimersByName[hc.GetName()].Stop()
+			}
+			return err
 		}
 		// reschedule next run of workflow
 		helper := r.createSubmitWorkflowHelper(ctx, log, wfNamespace, hc)
@@ -760,10 +781,16 @@ func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctr
 	// see: https://book.kubebuilder.io/reference/using-finalizers.html
 	if hc.ObjectMeta.DeletionTimestamp.IsZero() {
 		// since the underlying workflow has completed, we update the healthcheck accordingly
-		err := r.Update(ctx, hc)
+		err := r.updateHealthCheckStatus(ctx, log, hc)
 		if err != nil {
 			log.Error(err, "Error updating healthcheck resource")
 			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error updating healthcheck resource")
+			if r.RepeatTimersByName[req.NamespacedName.Name] != nil {
+				log.Info("Cancelling rescheduled workflow for this healthcheck due to deletion")
+				r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Cancelling workflow for this healthcheck due to deletion")
+				r.RepeatTimersByName[hc.GetName()].Stop()
+			}
+			return err
 		}
 	}
 
@@ -1268,4 +1295,30 @@ func (r *HealthCheckReconciler) DeleteClusterRoleBinding(clientset kubernetes.In
 
 	return nil
 
+}
+
+func (r *HealthCheckReconciler) updateHealthCheckStatus(ctx context.Context, log logr.Logger, hc *activemonitorv1alpha1.HealthCheck) error {
+	if err := r.Status().Update(ctx, hc); err != nil {
+		log.Error(err, "HealthCheck status could not be updated.")
+		r.Recorder.Event(hc, "Warning", "Failed", fmt.Sprintf("HealthCheck %s/%s status could not be updated. %v", hc.Namespace, hc.Name, err))
+		return err
+	}
+
+	return nil
+}
+
+func (r *HealthCheckReconciler) ContainsEqualFoldSubstring(str, substr string) bool {
+	x := strings.ToLower(str)
+	y := strings.ToLower(substr)
+	if strings.Contains(x, y) {
+		return true
+	}
+	return false
+}
+
+func (r *HealthCheckReconciler) IsStorageError(err error) bool {
+	if r.ContainsEqualFoldSubstring(err.Error(), "StorageError: invalid object") {
+		return true
+	}
+	return false
 }
