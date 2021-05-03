@@ -21,6 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ghodss/yaml"
@@ -86,6 +87,7 @@ type HealthCheckReconciler struct {
 	MaxParallel        int
 	RepeatTimersByName map[string]*time.Timer
 	workflowLabels     map[string]string
+	TimerLock          sync.RWMutex
 }
 
 func ignoreNotFound(err error) error {
@@ -104,6 +106,7 @@ func NewHealthCheckReconciler(mgr manager.Manager, log logr.Logger, MaxParallel 
 		kubeclient:  kubernetes.NewForConfigOrDie(mgr.GetConfig()),
 		Log:         log,
 		MaxParallel: MaxParallel,
+		TimerLock:   sync.RWMutex{},
 	}
 }
 
@@ -128,14 +131,13 @@ func (r *HealthCheckReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 		// see: https://book.kubebuilder.io/cronjob-tutorial/controller-implementation.html#1-load-the-cronjob-by-name
 		log.Info("Healthcheck object not found for reconciliation, likely deleted")
 		// stop timer corresponding to next schedule run of workflow since parent healthcheck no longer exists
-		if r.RepeatTimersByName[req.NamespacedName.Name] != nil {
+		if r.GetTimerByName(req.NamespacedName.Name) != nil {
 			log.Info("Cancelling rescheduled workflow for this healthcheck due to deletion")
 			r.Recorder.Event(healthCheck, v1.EventTypeNormal, "Normal", "Cancelling workflow for this healthcheck due to deletion")
-			r.RepeatTimersByName[req.NamespacedName.Name].Stop()
+			r.GetTimerByName(req.NamespacedName.Name).Stop()
 		}
 		return ctrl.Result{}, ignoreNotFound(err)
 	}
-
 	return r.processOrRecoverHealthCheck(ctx, log, healthCheck)
 }
 
@@ -664,16 +666,18 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 		if err != nil {
 			log.Error(err, "Error updating healthcheck resource")
 			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error updating healthcheck resource")
-			if r.RepeatTimersByName[req.NamespacedName.Name] != nil {
+			if r.GetTimerByName(req.NamespacedName.Name) != nil {
 				log.Info("Cancelling rescheduled workflow for this healthcheck due to deletion")
 				r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Cancelling workflow for this healthcheck due to deletion")
-				r.RepeatTimersByName[hc.GetName()].Stop()
+				r.GetTimerByName(hc.GetName()).Stop()
 			}
 			return err
 		}
 		// reschedule next run of workflow
 		helper := r.createSubmitWorkflowHelper(ctx, log, wfNamespace, hc)
+		r.TimerLock.Lock()
 		r.RepeatTimersByName[hc.GetName()] = time.AfterFunc(time.Duration(repeatAfterSec)*time.Second, helper)
+		r.TimerLock.Unlock()
 		log.Info("Rescheduled workflow for next run", "namespace", wfNamespace, "name", wfName)
 		r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Rescheduled workflow for next run")
 	}
@@ -785,10 +789,10 @@ func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctr
 		if err != nil {
 			log.Error(err, "Error updating healthcheck resource")
 			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error updating healthcheck resource")
-			if r.RepeatTimersByName[req.NamespacedName.Name] != nil {
+			if r.GetTimerByName(req.NamespacedName.Name) != nil {
 				log.Info("Cancelling rescheduled workflow for this healthcheck due to deletion")
 				r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Cancelling workflow for this healthcheck due to deletion")
-				r.RepeatTimersByName[hc.GetName()].Stop()
+				r.GetTimerByName(hc.GetName()).Stop()
 			}
 			return err
 		}
@@ -1321,4 +1325,11 @@ func (r *HealthCheckReconciler) IsStorageError(err error) bool {
 		return true
 	}
 	return false
+}
+
+func (r *HealthCheckReconciler) GetTimerByName(name string) *time.Timer {
+	r.TimerLock.RLock()
+	s := r.RepeatTimersByName[name]
+	r.TimerLock.RUnlock()
+	return s
 }
