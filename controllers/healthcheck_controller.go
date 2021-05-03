@@ -21,6 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ghodss/yaml"
@@ -86,6 +87,7 @@ type HealthCheckReconciler struct {
 	MaxParallel        int
 	RepeatTimersByName map[string]*time.Timer
 	workflowLabels     map[string]string
+	Locker             sync.Mutex
 }
 
 func ignoreNotFound(err error) error {
@@ -673,7 +675,9 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 		}
 		// reschedule next run of workflow
 		helper := r.createSubmitWorkflowHelper(ctx, log, wfNamespace, hc)
+		r.Locker.Lock()
 		r.RepeatTimersByName[hc.GetName()] = time.AfterFunc(time.Duration(repeatAfterSec)*time.Second, helper)
+		r.Locker.Unlock()
 		log.Info("Rescheduled workflow for next run", "namespace", wfNamespace, "name", wfName)
 		r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Rescheduled workflow for next run")
 	}
