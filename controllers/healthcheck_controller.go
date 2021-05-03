@@ -87,7 +87,7 @@ type HealthCheckReconciler struct {
 	MaxParallel        int
 	RepeatTimersByName map[string]*time.Timer
 	workflowLabels     map[string]string
-	Locker             sync.RWMutex
+	TimerLock          sync.RWMutex
 }
 
 func ignoreNotFound(err error) error {
@@ -106,7 +106,7 @@ func NewHealthCheckReconciler(mgr manager.Manager, log logr.Logger, MaxParallel 
 		kubeclient:  kubernetes.NewForConfigOrDie(mgr.GetConfig()),
 		Log:         log,
 		MaxParallel: MaxParallel,
-		Locker:      sync.RWMutex{},
+		TimerLock:   sync.RWMutex{},
 	}
 }
 
@@ -675,9 +675,9 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 		}
 		// reschedule next run of workflow
 		helper := r.createSubmitWorkflowHelper(ctx, log, wfNamespace, hc)
-		r.Locker.Lock()
+		r.TimerLock.Lock()
 		r.RepeatTimersByName[hc.GetName()] = time.AfterFunc(time.Duration(repeatAfterSec)*time.Second, helper)
-		r.Locker.Unlock()
+		r.TimerLock.Unlock()
 		log.Info("Rescheduled workflow for next run", "namespace", wfNamespace, "name", wfName)
 		r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Rescheduled workflow for next run")
 	}
@@ -1328,8 +1328,8 @@ func (r *HealthCheckReconciler) IsStorageError(err error) bool {
 }
 
 func (r *HealthCheckReconciler) GetTimerByName(name string) *time.Timer {
-	r.Locker.RLock()
+	r.TimerLock.RLock()
 	s := r.RepeatTimersByName[name]
-	r.Locker.RUnlock()
+	r.TimerLock.RUnlock()
 	return s
 }
