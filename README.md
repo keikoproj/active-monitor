@@ -4,7 +4,7 @@
 [![PR](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)][GithubPrsUrl]
 [![slack](https://img.shields.io/badge/slack-join%20the%20conversation-ff69b4.svg)][SlackUrl]
 
-![version](https://img.shields.io/badge/version-0.5.1-blue.svg?cacheSeconds=2592000)
+![version](https://img.shields.io/badge/version-0.5.2-blue.svg?cacheSeconds=2592000)
 [![Build Status][BuildStatusImg]][BuildMasterUrl]
 [![codecov][CodecovImg]][CodecovUrl]
 [![Go Report Card][GoReportImg]][GoReportUrl]
@@ -23,13 +23,13 @@ Active-Monitor sets the status of the HealthCheck CR to indicate whether the mon
 
 RemedyRunsLimit parameter allows to configure how many times a remedy should be run. If Remedy action fails for any reason it will stop on further retries. It is an optional parameter. If it is not set Remedyworkflow is triggered whenever HealthCheck workflow fails.
 
-RemedyResetInterval parameter allows resetting remedy after the reset interval time and RemedyWorkflow can be retried again in case monitor workflow fails. If remedy reaches a RemedyRunsLimit it will be reset when HealthCheck passes in any subsequent run before RemedyResetInterval. 
+RemedyResetInterval parameter allows resetting remedy after the reset interval time and RemedyWorkflow can be retried again in case monitor workflow fails. If remedy reaches a RemedyRunsLimit it will be reset when HealthCheck passes in any subsequent run before RemedyResetInterval.
 
 Typical examples of such workflows include tests for basic Kubernetes object creation/deletion, tests for cluster-wide services such as policy engines checks, authentication and authorization checks, etc.
 
 The sort of HealthChecks one could run with Active-Monitor are:
 - verify namespace and deployment creation
-- verify AWS resources are using < 80% of their instance limits 
+- verify AWS resources are using < 80% of their instance limits
 - verify kube-dns by running DNS lookups on the network
 - verify kube-dns by running DNS lookups on localhost
 - verify KIAM agent by running aws sts get-caller-identity on all available nodes
@@ -180,19 +180,19 @@ spec:
       serviceAccount: activemonitor-controller-sa
       source:
         inline: |
-            apiVersion: argoproj.io/v1alpha1
-            kind: Workflow
-            spec:
-              ttlSecondsAfterFinished: 60
-              entrypoint: start
-              templates:
-              - name: start
-                retryStrategy:
-                  limit: 3
-                container: 
-                  image: tutum/dnsutils
-                  command: [sh, -c]
-                  args: ["nslookup www.google.com"]
+          apiVersion: argoproj.io/v1alpha1
+          kind: Workflow
+          spec:
+            ttlSecondsAfterFinished: 60
+            entrypoint: start
+            templates:
+            - name: start
+              retryStrategy:
+                limit: 3
+              container: 
+                image: tutum/dnsutils
+                command: [sh, -c]
+                args: ["nslookup www.google.com"]
 ```
 #### Sample RemedyWorkflow CR:
 ```
