@@ -29,7 +29,7 @@ jobs:
 
       - name: Get kubebuilder
         env:
-          version: 1.0.8 # latest stable version
+          version: 3.1.0 # latest stable version
           arch: amd64
         run: |
           # download the release
