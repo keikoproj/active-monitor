@@ -20,20 +20,13 @@ jobs:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v2
 
-      - name: Golangci-lint
-        uses: golangci/golangci-lint-action@v2
-        with:
-          # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
-          version: v1.32
-          args: --timeout 2m
-
       - name: Get kubebuilder
         env:
-          version: 3.1.0 # latest stable version
+          version: 2.3.1 # latest stable version
           arch: amd64
         run: |
           # download the release
-          curl -L -O "https://github.com/kubernetes-sigs/kubebuilder/releases/download/v${version}/kubebuilder_${version}_linux_${arch}.tar.gz"
+          curl -L -O "https://github.com/kubernetes-sigs/kubebuilder/releases/download/v2.3.1/kubebuilder_2.3.1_linux_amd64.tar.gz"
           # extract the archive
           tar -zxvf kubebuilder_${version}_linux_${arch}.tar.gz
           mv kubebuilder_${version}_linux_${arch} kubebuilder && sudo mv kubebuilder /usr/local/
