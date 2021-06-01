@@ -1,0 +1,51 @@
+name: unit-test
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  unit-test:
+    if: github.repository_owner == 'keikoproj'
+    name: unit-test
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v2
+        with:
+          go-version: ^1.15
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v2
+
+      - name: Golangci-lint
+        uses: golangci/golangci-lint-action@v2
+        with:
+          # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
+          version: v1.32
+          args: --timeout 2m
+
+      - name: Get kubebuilder
+        env:
+          version: 3.1.0 # latest stable version
+          arch: amd64
+        run: |
+          # download the release
+          curl -L -O "https://github.com/kubernetes-sigs/kubebuilder/releases/download/v${version}/kubebuilder_${version}_linux_${arch}.tar.gz"
+          # extract the archive
+          tar -zxvf kubebuilder_${version}_linux_${arch}.tar.gz
+          mv kubebuilder_${version}_linux_${arch} kubebuilder && sudo mv kubebuilder /usr/local/
+          # update your PATH to include /usr/local/kubebuilder/bin
+          export PATH=$PATH:/usr/local/kubebuilder/bin
+      - name: Build
+        run: |
+          make manager
+      - name: Test
+        run: |
+          make test
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v1
+        with:
+          file: ./coverage.txt
