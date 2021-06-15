@@ -54,7 +54,6 @@ const (
 	wfResource                = "workflows"
 	succStr                   = "Succeeded"
 	failStr                   = "Failed"
-	defaultWorkflowTTLSec     = 1800
 	remedy                    = "remedy"
 	healthcheck               = "healthCheck"
 	healthCheckClusterLevel   = "cluster"
