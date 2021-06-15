@@ -888,9 +888,6 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 		hc.Spec.Workflow.Timeout = hc.Spec.RepeatAfterSec
 		timeout = int64(hc.Spec.Workflow.Timeout)
 	}
-	if ttlSecondAfterFinished := data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"]; ttlSecondAfterFinished == nil {
-		data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"] = defaultWorkflowTTLSec
-	}
 	// set service account, if specified
 	if hc.Spec.Workflow.Resource.ServiceAccount != "" {
 		data["spec"].(map[string]interface{})["serviceAccountName"] = hc.Spec.Workflow.Resource.ServiceAccount
@@ -990,10 +987,6 @@ func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logg
 	if podGC := data["spec"].(map[string]interface{})["podGC"]; podGC == nil {
 		data["spec"].(map[string]interface{})["podGC"] = &pgc
 	}
-	// make sure workflows by default get cleaned up
-	if ttlSecondAfterFinished := data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"]; ttlSecondAfterFinished == nil {
-		data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"] = defaultWorkflowTTLSec
-	}
 	// set service account, if specified
 	if hc.Spec.RemedyWorkflow.Resource.ServiceAccount != "" {
 		data["spec"].(map[string]interface{})["serviceAccountName"] = hc.Spec.RemedyWorkflow.Resource.ServiceAccount
@@ -1016,6 +1009,7 @@ func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logg
 		r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Invalid remedy workflow template spec")
 		return err
 	}
+	log.Info("spec after updating:", spec)
 	content["spec"] = spec
 	uwf.SetUnstructuredContent(content)
 	r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Remedy workflow is parsed from healthcheck")
