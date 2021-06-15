@@ -897,7 +897,6 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 	if activeDeadlineSeconds := data["spec"].(map[string]interface{})["activeDeadlineSeconds"]; activeDeadlineSeconds == nil {
 		data["spec"].(map[string]interface{})["activeDeadlineSeconds"] = &timeout
 	}
-	log.Info("HealthCheck with Workflow", "Spec:", data)
 	spec, ok := data["spec"]
 	if !ok {
 		err := errors.New("invalid workflow, missing spec")
@@ -1009,7 +1008,6 @@ func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logg
 		r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Invalid remedy workflow template spec")
 		return err
 	}
-	log.Info("spec after updating:", spec)
 	content["spec"] = spec
 	uwf.SetUnstructuredContent(content)
 	r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Remedy workflow is parsed from healthcheck")
