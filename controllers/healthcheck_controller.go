@@ -471,7 +471,9 @@ func (r *HealthCheckReconciler) createSubmitWorkflow(ctx context.Context, log lo
 	workflow.SetGroupVersionKind(wfGvk)
 	workflow.SetNamespace(hc.Spec.Workflow.Resource.Namespace)
 	workflow.SetGenerateName(hc.Spec.Workflow.GenerateName)
+	r.TimerLock.RLock()
 	workflow.SetLabels(r.workflowLabels)
+	r.TimerLock.RUnlock()
 	// set the owner references for workflow
 	ownerReferences := workflow.GetOwnerReferences()
 	trueVar := true
@@ -503,8 +505,9 @@ func (r *HealthCheckReconciler) createSubmitRemedyWorkflow(ctx context.Context, 
 	remedyWorkflow.SetGroupVersionKind(wfGvk)
 	remedyWorkflow.SetNamespace(hc.Spec.RemedyWorkflow.Resource.Namespace)
 	remedyWorkflow.SetGenerateName(hc.Spec.RemedyWorkflow.GenerateName)
+	r.TimerLock.RLock()
 	remedyWorkflow.SetLabels(r.workflowLabels)
-
+	r.TimerLock.RUnlock()
 	// set the owner references for workflow
 	ownerReferences := remedyWorkflow.GetOwnerReferences()
 	trueVar := true
@@ -833,7 +836,7 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 		if !tr {
 			log.Info("Workflow Labels are not set. ")
 		}
-
+		r.TimerLock.Lock()
 		if r.workflowLabels == nil {
 			r.workflowLabels = make(map[string]string)
 		}
@@ -865,6 +868,7 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 		log.Info("Workflow Labels are set:", "wflabel:", r.workflowLabels)
 		log.Info("metadata for Workflow is updated", "metadata generateName:", m1.generateName, "metadata label:", m1.labels)
 	}
+	r.TimerLock.Unlock()
 
 	content := uwf.UnstructuredContent()
 	type PodGCStrategy string
@@ -939,11 +943,10 @@ func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logg
 		if !tr {
 			log.Info("Workflow Labels are not set. ")
 		}
-
+		r.TimerLock.Lock()
 		if r.workflowLabels == nil {
 			r.workflowLabels = make(map[string]string)
 		}
-
 		//assign instanceId labels to workflows
 		if wflabels == nil {
 			r.workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
@@ -969,6 +972,7 @@ func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logg
 		m1 := metadata{generateName: hc.Spec.Workflow.GenerateName, labels: r.workflowLabels}
 		data["metadata"] = m1
 		log.Info("Workflow Labels are set:", "wflabel:", r.workflowLabels)
+		r.TimerLock.Unlock()
 		log.Info("metadata for Workflow is updated", "metadata generateName:", m1.generateName, "metadata label:", m1.labels)
 	}
 
