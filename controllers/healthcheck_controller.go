@@ -54,7 +54,6 @@ const (
 	wfResource                = "workflows"
 	succStr                   = "Succeeded"
 	failStr                   = "Failed"
-	defaultWorkflowTTLSec     = 1800
 	remedy                    = "remedy"
 	healthcheck               = "healthCheck"
 	healthCheckClusterLevel   = "cluster"
@@ -888,9 +887,6 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 		hc.Spec.Workflow.Timeout = hc.Spec.RepeatAfterSec
 		timeout = int64(hc.Spec.Workflow.Timeout)
 	}
-	if ttlSecondAfterFinished := data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"]; ttlSecondAfterFinished == nil {
-		data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"] = defaultWorkflowTTLSec
-	}
 	// set service account, if specified
 	if hc.Spec.Workflow.Resource.ServiceAccount != "" {
 		data["spec"].(map[string]interface{})["serviceAccountName"] = hc.Spec.Workflow.Resource.ServiceAccount
@@ -900,7 +896,6 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 	if activeDeadlineSeconds := data["spec"].(map[string]interface{})["activeDeadlineSeconds"]; activeDeadlineSeconds == nil {
 		data["spec"].(map[string]interface{})["activeDeadlineSeconds"] = &timeout
 	}
-	log.Info("HealthCheck with Workflow", "Spec:", data)
 	spec, ok := data["spec"]
 	if !ok {
 		err := errors.New("invalid workflow, missing spec")
@@ -989,10 +984,6 @@ func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logg
 	}
 	if podGC := data["spec"].(map[string]interface{})["podGC"]; podGC == nil {
 		data["spec"].(map[string]interface{})["podGC"] = &pgc
-	}
-	// make sure workflows by default get cleaned up
-	if ttlSecondAfterFinished := data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"]; ttlSecondAfterFinished == nil {
-		data["spec"].(map[string]interface{})["ttlSecondsAfterFinished"] = defaultWorkflowTTLSec
 	}
 	// set service account, if specified
 	if hc.Spec.RemedyWorkflow.Resource.ServiceAccount != "" {

@@ -435,9 +435,12 @@ metadata:
   name: workflow-controller-configmap
   namespace: health
 data:
-  config: |
-    instanceID: activemonitor-workflows
-    namespace: health
+  instanceID: activemonitor-workflows
+  namespace: health
+  workflowDefaults: |
+    spec:
+      ttlStrategy:
+        SecondsAfterCompletion: 1800
 ---
 apiVersion: v1
 kind: Service
