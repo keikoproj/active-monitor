@@ -10,8 +10,9 @@ Bleeding-edge development, not yet released
 ## [0.6.0] - 2021-06-17
 ### Added
 - Move to Github Actions for CI enhancement - #81
-  Update Default TTL Strategy to secondsAfterCompletion - #99
-  Update Argo controller version - #80
+## Updated
+-  Update Default TTL Strategy to secondsAfterCompletion - #99
+-  Update Argo controller version - #80
 ### Fixed
 -   Active Monitor crashing with concurrent map updates - #98
 
