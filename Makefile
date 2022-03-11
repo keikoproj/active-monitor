@@ -11,7 +11,7 @@ all: manager
 
 # Run tests
 test: generate fmt vet manifests
-	go test ./api/... ./controllers/... ./metrics/... ./store/... -coverprofile coverage.txt
+	go test -v ./api/... ./controllers/... ./metrics/... ./store/... -coverprofile coverage.txt
 
 # Build manager binary
 manager: generate fmt vet
