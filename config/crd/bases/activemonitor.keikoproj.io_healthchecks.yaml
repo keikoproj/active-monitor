@@ -8,29 +8,6 @@ metadata:
   creationTimestamp: null
   name: healthchecks.activemonitor.keikoproj.io
 spec:
-  versions:
-  - name: v1alpha1
-    served: true
-    storage: true
-  additionalPrinterColumns:
-  - JSONPath: .status.status
-    name: LATEST STATUS
-    type: string
-  - JSONPath: .status.successCount
-    name: 'SUCCESS CNT  '
-    type: string
-  - JSONPath: .status.failedCount
-    name: FAIL CNT
-    type: string
-  - JSONPath: .status.remedySuccessCount
-    name: 'REMEDY SUCCESS CNT  '
-    type: string
-  - JSONPath: .status.remedyFailedCount
-    name: REMEDY FAIL CNT
-    type: string
-  - JSONPath: .metadata.creationTimestamp
-    name: Age
-    type: date
   group: activemonitor.keikoproj.io
   names:
     kind: HealthCheck
@@ -41,6 +18,29 @@ spec:
     - hcs
     singular: healthcheck
   scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      additionalPrinterColumns:
+        - JSONPath: .status.status
+          name: LATEST STATUS
+          type: string
+        - JSONPath: .status.successCount
+          name: 'SUCCESS CNT  '
+          type: string
+        - JSONPath: .status.failedCount
+          name: FAIL CNT
+          type: string
+        - JSONPath: .status.remedySuccessCount
+          name: 'REMEDY SUCCESS CNT  '
+          type: string
+        - JSONPath: .status.remedyFailedCount
+          name: REMEDY FAIL CNT
+          type: string
+        - JSONPath: .metadata.creationTimestamp
+          name: Age
+          type: date
   subresources:
     status: {}
   validation:
