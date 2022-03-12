@@ -41,6 +41,181 @@ spec:
         - jsonPath: .metadata.creationTimestamp
           name: Age
           type: date
+  schema:
+    openAPIV3Schema:
+      description: HealthCheck is the Schema for the healthchecks API
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: HealthCheckSpec defines the desired state of HealthCheck Either
+            RepeatAfterSec or Schedule must be defined for the health check to run
+          properties:
+            description:
+              type: string
+            level:
+              type: string
+            remedyResetInterval:
+              type: integer
+            remedyRunsLimit:
+              type: integer
+            remedyworkflow:
+              description: Workflow struct describes a Remedy workflow
+              properties:
+                generateName:
+                  type: string
+                resource:
+                  description: ResourceObject is the resource object to create on
+                    kubernetes
+                  properties:
+                    namespace:
+                      description: Namespace in which to create this object defaults
+                        to the service account namespace
+                      type: string
+                    serviceAccount:
+                      type: string
+                    source:
+                      description: Source of the K8 resource file(s)
+                      properties:
+                        file:
+                          description: FileArtifact contains information about an
+                            artifact in a filesystem
+                          properties:
+                            path:
+                              type: string
+                          type: object
+                        inline:
+                          type: string
+                        url:
+                          description: URLArtifact contains information about an artifact
+                            at an http endpoint.
+                          properties:
+                            path:
+                              type: string
+                            verifyCert:
+                              type: boolean
+                          type: object
+                      type: object
+                  required:
+                  - namespace
+                  - source
+                  type: object
+                workflowtimeout:
+                  type: integer
+              type: object
+            repeatAfterSec:
+              type: integer
+            schedule:
+              description: ScheduleSpec contains the cron expression
+              properties:
+                cron:
+                  description: 'cron expressions can be found here: https://godoc.org/github.com/robfig/cron'
+                  type: string
+              type: object
+            workflow:
+              description: Workflow struct describes an Argo workflow
+              properties:
+                generateName:
+                  type: string
+                resource:
+                  description: ResourceObject is the resource object to create on
+                    kubernetes
+                  properties:
+                    namespace:
+                      description: Namespace in which to create this object defaults
+                        to the service account namespace
+                      type: string
+                    serviceAccount:
+                      type: string
+                    source:
+                      description: Source of the K8 resource file(s)
+                      properties:
+                        file:
+                          description: FileArtifact contains information about an
+                            artifact in a filesystem
+                          properties:
+                            path:
+                              type: string
+                          type: object
+                        inline:
+                          type: string
+                        url:
+                          description: URLArtifact contains information about an artifact
+                            at an http endpoint.
+                          properties:
+                            path:
+                              type: string
+                            verifyCert:
+                              type: boolean
+                          type: object
+                      type: object
+                  required:
+                  - namespace
+                  - source
+                  type: object
+                workflowtimeout:
+                  type: integer
+              type: object
+          required:
+          - workflow
+          type: object
+        status:
+          description: HealthCheckStatus defines the observed state of HealthCheck
+          properties:
+            errorMessage:
+              type: string
+            failedCount:
+              type: integer
+            finishedAt:
+              format: date-time
+              type: string
+            lastFailedAt:
+              format: date-time
+              type: string
+            lastFailedWorkflow:
+              type: string
+            lastSuccessfulWorkflow:
+              type: string
+            remedyErrorMessage:
+              type: string
+            remedyFailedCount:
+              type: integer
+            remedyFinishedAt:
+              format: date-time
+              type: string
+            remedyLastFailedAt:
+              format: date-time
+              type: string
+            remedyStatus:
+              type: string
+            remedySuccessCount:
+              type: integer
+            remedyTotalRuns:
+              type: integer
+            remedyTriggeredAt:
+              format: date-time
+              type: string
+            startedAt:
+              format: date-time
+              type: string
+            status:
+              type: string
+            successCount:
+              type: integer
+            totalHealthCheckRuns:
+              type: integer
+          type: object
+      type: object
 status:
   acceptedNames:
     kind: ""
