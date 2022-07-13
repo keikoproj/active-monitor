@@ -5,6 +5,7 @@
 *.dll
 *.so
 *.dylib
+testbin/*
 
 # Temporary or metadata files
 *.yaml-e

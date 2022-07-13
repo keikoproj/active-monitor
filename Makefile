@@ -5,16 +5,39 @@ LATEST_IMG ?= keikoproj/active-monitor:latest
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true"
 
+# Tools required to run the full suite of tests properly
+OSNAME           ?= $(shell uname -s | tr A-Z a-z)
+KUBEBUILDER_VER  ?= 3.0.0
+KUBEBUILDER_ARCH ?= amd64
+
+LOCAL  ?= true
+
+# Setting SHELL to bash allows bash commands to be executed by recipes.
+# This is a requirement for 'setup-envtest.sh' in the test target.
+# Options are set to exit when a recipe line exits non-zero or a piped command fails.
+SHELL = /usr/bin/env bash -o pipefail
+.SHELLFLAGS = -ec
+
 export GO111MODULE = on
 
 all: manager
 
+mock:
+	go install github.com/golang/mock/mockgen@v1.6.0
+	@echo "mockgen is in progess"
+	@for pkg in $(shell go list ./...) ; do \
+		go generate ./... ;\
+	done
+
 # Run tests
-test: generate fmt vet manifests
-	go test ./api/... ./controllers/... ./metrics/... ./store/... -coverprofile coverage.txt
+ENVTEST_ASSETS_DIR=$(shell pwd)/testbin
+test: mock generate fmt vet manifests
+	mkdir -p ${ENVTEST_ASSETS_DIR}
+	test -f ${ENVTEST_ASSETS_DIR}/setup-envtest.sh || curl -sSLo ${ENVTEST_ASSETS_DIR}/setup-envtest.sh https://raw.githubusercontent.com/kubernetes-sigs/controller-runtime/v0.7.2/hack/setup-envtest.sh
+	source ${ENVTEST_ASSETS_DIR}/setup-envtest.sh; fetch_envtest_tools $(ENVTEST_ASSETS_DIR); setup_envtest_env $(ENVTEST_ASSETS_DIR); LOCAL=$(LOCAL) go test ./api/... ./controllers/... ./metrics/... ./store/... -coverprofile coverage.txt
 
 # Build manager binary
-manager: generate fmt vet
+manager: mock generate fmt vet
 	go build -o bin/manager main.go
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
@@ -61,8 +84,14 @@ docker-push:
 # download controller-gen if necessary
 controller-gen:
 ifeq (, $(shell which controller-gen))
-	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.2.4
+	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.2.4
 CONTROLLER_GEN=$(shell go env GOPATH)/bin/controller-gen
 else
 CONTROLLER_GEN=$(shell which controller-gen)
 endif
+
+.PHONY: kubebuilder
+kubebuilder:
+	@echo "Downloading and installing Kubebuilder - this requires sudo privileges"
+	curl -fsSL -O "https://github.com/kubernetes-sigs/kubebuilder/releases/download/v$(KUBEBUILDER_VER)/kubebuilder_$(OSNAME)_$(KUBEBUILDER_ARCH)"
+	chmod +x kubebuilder_$(OSNAME)_$(KUBEBUILDER_ARCH) && sudo mv kubebuilder_$(OSNAME)_$(KUBEBUILDER_ARCH) /usr/local/bin/
