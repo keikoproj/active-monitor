@@ -4,7 +4,7 @@ The Active-Monitor Project is released on an as-needed basis. The process is as 
 
 1. An issue is created which proposes a new release with a changelog since the last release
 1. All [OWNERS](.github/CODEOWNERS) are suggested to look at and sign off (ex: commenting with "LGTM") on this release
-1. An [OWNER](.github/CODEOWNERS) updates [CHANGELOG](./CHANGELOG) with release details and updates badge at top of [README](./README.md)
+1. An [OWNER](.github/CODEOWNERS) updates [CHANGELOG](./CHANGELOG.md) with release details and updates badge at top of [README](./README.md)
 1. A PR is created with these changes. Upon approval, it is merged to `master` branch.
 1. Now, at `HEAD` on `master` branch, an [OWNER](.github/CODEOWNERS) runs `git tag -a $VERSION` and pushes the tag with `git push --tags`
 1. The release is complete!
