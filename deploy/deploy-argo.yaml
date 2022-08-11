@@ -129,7 +129,8 @@ spec:
     singular: workflow
   scope: Namespaced
   versions:
-    - additionalPrinterColumns:
+    - name: v1alpha1
+      additionalPrinterColumns:
         - description: Status of the workflow
           jsonPath: .status.phase
           name: Status
@@ -139,7 +140,6 @@ spec:
           jsonPath: .status.startedAt
           name: Age
           type: date
-      name: v1alpha1
       schema:
         openAPIV3Schema:
           properties:
@@ -161,7 +161,6 @@ spec:
           type: object
       served: true
       storage: true
-      subresources: {}
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -256,6 +255,14 @@ rules:
       - patch
       - update
       - watch
+  - apiGroups:
+    - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - create
+      - get
+      - update
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -288,6 +295,14 @@ rules:
       - patch
       - update
       - watch
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - create
+      - get
+      - update
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -315,6 +330,14 @@ rules:
       - get
       - list
       - watch
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - create
+      - get
+      - update
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -410,6 +433,14 @@ rules:
       - create
       - get
       - delete
+  - apiGroups:
+    - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - create
+      - get
+      - update
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -433,9 +464,9 @@ roleRef:
   kind: ClusterRole
   name: argo-cluster-role
 subjects:
-- kind: ServiceAccount
-  name: argo
-  namespace: health
+  - kind: ServiceAccount
+    name: argo
+    namespace: health
 ---
 apiVersion: v1
 kind: ConfigMap

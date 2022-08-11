@@ -24,7 +24,7 @@ spec:
     spec:
       containers:
       - command:
-        - /manager
+        - /active-monitor-controller
         args:
         - --enable-leader-election
         image: controller:latest

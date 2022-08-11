@@ -48,6 +48,10 @@ run: generate fmt vet
 install: manifests
 	kubectl apply -f config/crd/bases
 
+# Uninstall CRDs from a cluster
+uninstall:
+	kubectl delete -f config/crd/bases
+
 # Deploy controller in the Kubernetes cluster configured at ~/.kube/config
 deploy: manifests
 	kubectl apply -f config/crd/bases
@@ -84,7 +88,7 @@ docker-push:
 # download controller-gen if necessary
 controller-gen:
 ifeq (, $(shell which controller-gen))
-	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.2.4
+	go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.4.1
 CONTROLLER_GEN=$(shell go env GOPATH)/bin/controller-gen
 else
 CONTROLLER_GEN=$(shell which controller-gen)
