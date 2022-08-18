@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 Bleeding-edge development, not yet released
 
+## [0.8.0] - 2022-08-18
+## Updated
+- Update active-monitor CRD from v1beta1 to v1 - #105
+- Update go version to 1.18 - #111
+### Fixed
+- Fix CHANGELOG file - #110
+- Fix after upgrade argo BDD fails with errors - #109
+
+## [0.7.0] - 2022-03-11
+## Updated
+- Update Argo workflow controller version to v3.2.6 - #107
+
 ## [0.6.0] - 2021-06-17
 ### Added
 - Move to Github Actions for CI enhancement - #81
@@ -60,7 +72,9 @@ Bleeding-edge development, not yet released
 ### Added
 - Initial commit of project
 
-[Unreleased]: https://github.com/keikoproj/active-monitor/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/keikoproj/active-monitor/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/keikoproj/active-monitor/compare/v0.7.0...v0.8.0
+[0.7.0]: https://github.com/keikoproj/active-monitor/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/keikoproj/active-monitor/compare/v0.5.2...v0.6.0
 [0.5.2]: https://github.com/keikoproj/active-monitor/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/keikoproj/active-monitor/compare/v0.5.0...v0.5.1
