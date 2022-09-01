@@ -31,6 +31,7 @@ rules:
   resources:
   - workflow
   - workflows
+  - workflowtaskresults
   - workflowtasksets
   verbs:
   - create

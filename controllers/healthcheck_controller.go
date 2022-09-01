@@ -111,7 +111,7 @@ func NewHealthCheckReconciler(mgr manager.Manager, log logr.Logger, MaxParallel 
 
 // +kubebuilder:rbac:groups=activemonitor.keikoproj.io,resources=healthchecks,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=activemonitor.keikoproj.io,resources=healthchecks/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=argoproj.io,resources=workflow;workflows;workflowtasksets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=argoproj.io,resources=workflow;workflows;workflowtasksets;workflowtaskresults,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile per kubebuilder v2 pattern
 func (r *HealthCheckReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
