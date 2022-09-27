@@ -4,7 +4,7 @@
 [![PR](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)][GithubPrsUrl]
 [![slack](https://img.shields.io/badge/slack-join%20the%20conversation-ff69b4.svg)][SlackUrl]
 
-![version](https://img.shields.io/badge/version-0.9.0-blue.svg?cacheSeconds=2592000)
+![version](https://img.shields.io/badge/version-0.10.0-blue.svg?cacheSeconds=2592000)
 [![Build Status][BuildStatusImg]][BuildMasterUrl]
 [![codecov][CodecovImg]][CodecovUrl]
 [![Go Report Card][GoReportImg]][GoReportUrl]
