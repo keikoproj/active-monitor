@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 Bleeding-edge development, not yet released
 
+## [0.10.0] - 2022-09-27
+## Updated
+- Fix remedyWorkflow deleting RBAC and Service Account created from external system - #122
+
 ## [0.9.0] - 2022-09-01
 ## Updated
 - Update workflow-controller and argo-exec version to v3.3.9 - #117
@@ -77,6 +81,7 @@ Bleeding-edge development, not yet released
 - Initial commit of project
 
 [Unreleased]: https://github.com/keikoproj/active-monitor/compare/v0.9.0...HEAD
+[0.10.0]: https://github.com/keikoproj/active-monitor/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/keikoproj/active-monitor/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/keikoproj/active-monitor/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/keikoproj/active-monitor/compare/v0.6.0...v0.7.0
