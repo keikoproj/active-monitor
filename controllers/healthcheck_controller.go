@@ -16,13 +16,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"sync"
+	"time"
+
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"strings"
-	"sync"
-	"time"
 
 	"github.com/ghodss/yaml"
 	"github.com/go-logr/logr"
@@ -61,6 +62,8 @@ const (
 	WfInstanceIdLabelKey      = "workflows.argoproj.io/controller-instanceid"
 	WfInstanceId              = "activemonitor-workflows"
 	PodGCOnPodCompletion      = "OnPodCompletion"
+	WfManagedByLabelKey       = "workflows.argoproj.io/managed-by"
+	WfManagedByValue          = "active-monitor"
 )
 
 var (
@@ -268,106 +271,81 @@ func (r *HealthCheckReconciler) createRBACForWorkflow(log logr.Logger, hc *activ
 	}
 
 	if workFlowType != remedy {
-		servacc, err := r.createServiceAccount(r.kubeclient, hcSa, wfNamespace)
+		_, err := r.createServiceAccount(r.kubeclient, log, hc, hcSa, wfNamespace)
 		if err != nil {
 			log.Error(err, "Error creating ServiceAccount for the workflow")
 			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error creating ServiceAccount for the workflow")
 			return err
 		}
-		log.Info("Successfully Created", "ServiceAccount", servacc)
-		r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Created ServiceAccount")
 	} else {
-		servacc1, err := r.createServiceAccount(r.kubeclient, remedySa, wfRemedyNamespace)
+		_, err := r.createServiceAccount(r.kubeclient, log, hc, remedySa, wfRemedyNamespace)
 		if err != nil {
 			log.Error(err, "Error creating ServiceAccount for the workflow")
 			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error creating ServiceAccount for the workflow")
 			return err
 		}
-		log.Info("Successfully Created", "ServiceAccount", servacc1)
-		r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Created ServiceAccount")
 	}
 	if level == healthCheckClusterLevel {
 
 		if workFlowType != remedy {
-			clusrole, err := r.createClusterRole(r.kubeclient, amclusterRole)
+			_, err := r.createClusterRole(r.kubeclient, log, hc, amclusterRole)
 			if err != nil {
 				log.Error(err, "Error creating ClusterRole for the healthcheck workflow")
 				r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error creating ClusterRole for the healthcheck workflow")
 				return err
 			}
-			log.Info("Successfully Created", "ClusterRole", clusrole)
-			r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Created clusterrole")
 
-			crb, err := r.createClusterRoleBinding(r.kubeclient, amclusterRoleBinding, amclusterRole, hcSa, wfNamespace)
+			_, err = r.createClusterRoleBinding(r.kubeclient, log, hc, amclusterRoleBinding, amclusterRole, hcSa, wfNamespace)
 			if err != nil {
 				log.Error(err, "Error creating ClusterRoleBinding for the workflow")
 				r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error creating ClusterRoleBinding for the workflow")
 				return err
 			}
-			log.Info("Successfully Created", "ClusterRoleBinding", crb)
-			r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Created ClusterRoleBinding")
-
 		} else {
-			clusrole1, err := r.createRemedyClusterRole(r.kubeclient, amclusterRemedyRole)
+			_, err := r.createRemedyClusterRole(r.kubeclient, log, hc, amclusterRemedyRole)
 			if err != nil {
 				log.Error(err, "Error creating ClusterRole for the remedy workflow")
 				r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error creating ClusterRole for the remedy workflow")
 				return err
 			}
-			log.Info("Successfully Created", "ClusterRole", clusrole1)
-			r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Created ClusterRole")
 
-			crb1, err := r.createClusterRoleBinding(r.kubeclient, amclusterRoleRemedyBinding, amclusterRemedyRole, remedySa, wfRemedyNamespace)
+			_, err = r.createClusterRoleBinding(r.kubeclient, log, hc, amclusterRoleRemedyBinding, amclusterRemedyRole, remedySa, wfRemedyNamespace)
 			if err != nil {
 				log.Error(err, "Error creating ClusterRoleBinding for the workflow")
 				r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error creating ClusterRoleBinding for the remedy workflow")
 				return err
 			}
-			log.Info("Successfully Created", "ClusterRoleBinding", crb1)
-			r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Created ClusterRoleBinding")
-
 		}
 
 	} else if level == healthCheckNamespaceLevel {
 
 		if workFlowType != remedy {
-			nsRole, err := r.createNameSpaceRole(r.kubeclient, amnsRole, wfNamespace)
+			_, err := r.createNameSpaceRole(r.kubeclient, log, hc, amnsRole, wfNamespace)
 			if err != nil {
 				log.Error(err, "Error creating NamespaceRole for the workflow")
 				r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error creating NamespaceRole for the workflow")
 				return err
 			}
-			log.Info("Successfully Created", "NamespaceRole", nsRole)
-			r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Created NamespaceRole")
 
-			nsrb, err := r.createNameSpaceRoleBinding(r.kubeclient, amnsRoleBinding, amnsRole, hcSa, wfNamespace)
+			_, err = r.createNameSpaceRoleBinding(r.kubeclient, log, hc, amnsRoleBinding, amnsRole, hcSa, wfNamespace)
 			if err != nil {
 				log.Error(err, "Error creating NamespaceRoleBinding for the workflow")
 				r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error creating NamespaceRoleBinding for the workflow")
 				return err
 			}
-			log.Info("Successfully Created", "NamespaceRoleBinding", nsrb)
-			r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Created NamespaceRoleBinding")
-
 		} else {
-			nsRole1, err := r.createRemedyNameSpaceRole(r.kubeclient, amnsRemedyRole, wfRemedyNamespace)
+			_, err := r.createRemedyNameSpaceRole(r.kubeclient, log, hc, amnsRemedyRole, wfRemedyNamespace)
 			if err != nil {
 				log.Error(err, "Error creating NamespaceRole for the workflow")
 				r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error creating NamespaceRole for the workflow")
 				return err
 			}
-			log.Info("Successfully Created", "NamespaceRole", nsRole1)
-			r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Created NamespaceRole")
-
-			nsrb1, err := r.createNameSpaceRoleBinding(r.kubeclient, amnsRemedyRoleBinding, amnsRemedyRole, remedySa, wfRemedyNamespace)
+			_, err = r.createNameSpaceRoleBinding(r.kubeclient, log, hc, amnsRemedyRoleBinding, amnsRemedyRole, remedySa, wfRemedyNamespace)
 			if err != nil {
 				log.Error(err, "Error creating NamespaceRoleBinding for the workflow")
 				r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error creating NamespaceRoleBinding for the workflow")
 				return err
 			}
-			log.Info("Successfully Created", "NamespaceRoleBinding", nsrb1)
-			r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Created NamespaceRoleBinding")
-
 		}
 
 	} else {
@@ -388,54 +366,41 @@ func (r *HealthCheckReconciler) deleteRBACForWorkflow(log logr.Logger, hc *activ
 
 	amnsRemedyRole := remedySa + "-ns-role"
 	amnsRemedyRoleBinding := remedySa + "-ns-role-binding"
-	err := r.DeleteServiceAccount(r.kubeclient, remedySa, wfRemedyNamespace)
+	err := r.DeleteServiceAccount(r.kubeclient, log, hc, remedySa, wfRemedyNamespace)
 	if err != nil {
 		log.Error(err, "Error deleting ServiceAccount for the workflow")
 		r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error deleting ServiceAccount for the workflow")
 		return err
 	}
-	log.Info("Successfully Deleted", "ServiceAccount", remedySa)
-	r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Deleted ServiceAccount")
-
 	if level == "cluster" {
 
-		err = r.DeleteClusterRole(r.kubeclient, amclusterRemedyRole)
+		err = r.DeleteClusterRole(r.kubeclient, log, hc, amclusterRemedyRole)
 		if err != nil {
 			log.Error(err, "Error deleting ClusterRole for the workflow")
 			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error deleting ClusterRole for the workflow")
 			return err
 		}
-		log.Info("Successfully Deleted", "ClusterRole", amclusterRemedyRole)
-		r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully deleted ClusterRole")
-
-		err = r.DeleteClusterRoleBinding(r.kubeclient, amclusterRoleRemedyBinding, amclusterRemedyRole, remedySa, wfRemedyNamespace)
+		err = r.DeleteClusterRoleBinding(r.kubeclient, log, hc, amclusterRoleRemedyBinding, amclusterRemedyRole, remedySa, wfRemedyNamespace)
 		if err != nil {
 			log.Error(err, "Error deleting ClusterRoleBinding for the workflow")
 			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error creating ClusterRoleBinding for the workflow")
 			return err
 		}
-		log.Info("Successfully Deleted", "ClusterRoleBinding", amclusterRoleRemedyBinding)
-		r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully deleted ClusterRoleBinding")
-
 	} else if level == "namespace" {
 
-		err := r.DeleteNameSpaceRole(r.kubeclient, amnsRemedyRole, wfRemedyNamespace)
+		err := r.DeleteNameSpaceRole(r.kubeclient, log, hc, amnsRemedyRole, wfRemedyNamespace)
 		if err != nil {
 			log.Error(err, "Error deleting NamespaceRole for the workflow")
 			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error deleting NamespaceRole for the workflow")
 			return err
 		}
-		log.Info("Successfully deleted", "NamespaceRole", amnsRemedyRole)
-		r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully deleted NamespaceRole")
 
-		err = r.DeleteNameSpaceRoleBinding(r.kubeclient, amnsRemedyRoleBinding, amnsRemedyRole, remedySa, wfRemedyNamespace)
+		err = r.DeleteNameSpaceRoleBinding(r.kubeclient, log, hc, amnsRemedyRoleBinding, amnsRemedyRole, remedySa, wfRemedyNamespace)
 		if err != nil {
 			log.Error(err, "Error deleting NamespaceRoleBinding for the workflow")
 			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error deleting NamespaceRole for the workflow")
 			return err
 		}
-		log.Info("Successfully Deleted", "NamespaceRoleBinding", amnsRemedyRoleBinding)
-		r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully deleted NamespaceRoleBinding")
 
 	} else {
 		err := errors.New("level is not set")
@@ -1023,10 +988,12 @@ func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logg
 }
 
 // Create ServiceAccount
-func (r *HealthCheckReconciler) createServiceAccount(clientset kubernetes.Interface, name string, namespace string) (string, error) {
+func (r *HealthCheckReconciler) createServiceAccount(clientset kubernetes.Interface, log logr.Logger, hc *activemonitorv1alpha1.HealthCheck, name string, namespace string) (string, error) {
 	sa, err := clientset.CoreV1().ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
 	// If a service account already exists just re-use it
 	if err == nil {
+		log.Info("Found existing", "ServiceAccount", sa.Name)
+		r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Existing ServiceAccount found")
 		return sa.Name, nil
 	}
 
@@ -1038,6 +1005,9 @@ func (r *HealthCheckReconciler) createServiceAccount(clientset kubernetes.Interf
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
+			Labels: map[string]string{
+				WfManagedByLabelKey: WfManagedByValue,
+			},
 		},
 	}
 
@@ -1045,36 +1015,47 @@ func (r *HealthCheckReconciler) createServiceAccount(clientset kubernetes.Interf
 	if err != nil {
 		return "", err
 	}
-
+	log.Info("Successfully Created", "ServiceAccount", sa.Name)
+	r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Created ServiceAccount")
 	return sa.Name, nil
 }
 
 //Delete a service Account
-func (r *HealthCheckReconciler) DeleteServiceAccount(clientset kubernetes.Interface, name string, namespace string) error {
-	_, err := clientset.CoreV1().ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
+func (r *HealthCheckReconciler) DeleteServiceAccount(clientset kubernetes.Interface, log logr.Logger, hc *activemonitorv1alpha1.HealthCheck, name string, namespace string) error {
+	sa, err := clientset.CoreV1().ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
 	// If a service account already exists just re-use it
 	if err != nil {
 		return err
 	}
 
-	err = clientset.CoreV1().ServiceAccounts(namespace).Delete(name, &metav1.DeleteOptions{})
-	if err != nil {
-		return err
+	// Delete only if created by the workflow
+	if val, ok := sa.Labels[WfManagedByLabelKey]; ok && val == WfManagedByValue {
+		err = clientset.CoreV1().ServiceAccounts(namespace).Delete(name, &metav1.DeleteOptions{})
+		if err != nil {
+			return err
+		}
+		log.Info("Successfully Deleted", "ServiceAccount", name)
+		r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Deleted ServiceAccount")
 	}
 
 	return nil
 }
 
 // create a ClusterRole
-func (r *HealthCheckReconciler) createClusterRole(clientset kubernetes.Interface, clusterrole string) (string, error) {
+func (r *HealthCheckReconciler) createClusterRole(clientset kubernetes.Interface, log logr.Logger, hc *activemonitorv1alpha1.HealthCheck, clusterrole string) (string, error) {
 	clusrole, err := clientset.RbacV1().ClusterRoles().Get(clusterrole, metav1.GetOptions{})
 	// If a Cluster Role already exists just re-use it
 	if err == nil {
+		log.Info("Found existing", "ClusterRole", clusrole.Name)
+		r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Existing clusterrole found")
 		return clusrole.Name, nil
 	}
 	clusrole, err = clientset.RbacV1().ClusterRoles().Create(&rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: clusterrole,
+			Labels: map[string]string{
+				WfManagedByLabelKey: WfManagedByValue,
+			},
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
@@ -1089,20 +1070,26 @@ func (r *HealthCheckReconciler) createClusterRole(clientset kubernetes.Interface
 	if err != nil {
 		return "", err
 	}
-
+	log.Info("Successfully Created", "ClusterRole", clusrole.Name)
+	r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Created clusterrole")
 	return clusrole.Name, nil
 }
 
 // create a ClusterRole
-func (r *HealthCheckReconciler) createRemedyClusterRole(clientset kubernetes.Interface, clusterrole string) (string, error) {
+func (r *HealthCheckReconciler) createRemedyClusterRole(clientset kubernetes.Interface, log logr.Logger, hc *activemonitorv1alpha1.HealthCheck, clusterrole string) (string, error) {
 	clusrole, err := clientset.RbacV1().ClusterRoles().Get(clusterrole, metav1.GetOptions{})
 	// If a Cluster Role already exists just re-use it
 	if err == nil {
+		log.Info("Found existing", "ClusterRole", clusrole.Name)
+		r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Existing ClusterRole found")
 		return clusrole.Name, nil
 	}
 	clusrole, err = clientset.RbacV1().ClusterRoles().Create(&rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: clusterrole,
+			Labels: map[string]string{
+				WfManagedByLabelKey: WfManagedByValue,
+			},
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
@@ -1116,37 +1103,48 @@ func (r *HealthCheckReconciler) createRemedyClusterRole(clientset kubernetes.Int
 	if err != nil {
 		return "", err
 	}
-
+	log.Info("Successfully Created", "ClusterRole", clusrole.Name)
+	r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Created ClusterRole")
 	return clusrole.Name, nil
 }
 
 // Delete a ClusterRole
-func (r *HealthCheckReconciler) DeleteClusterRole(clientset kubernetes.Interface, clusterrole string) error {
-	_, err := clientset.RbacV1().ClusterRoles().Get(clusterrole, metav1.GetOptions{})
+func (r *HealthCheckReconciler) DeleteClusterRole(clientset kubernetes.Interface, log logr.Logger, hc *activemonitorv1alpha1.HealthCheck, clusterrole string) error {
+	cr, err := clientset.RbacV1().ClusterRoles().Get(clusterrole, metav1.GetOptions{})
 	// If a Cluster Role already exists just re-use it
 	if err != nil {
 		return err
 	}
 
-	err = clientset.RbacV1().ClusterRoles().Delete(clusterrole, &metav1.DeleteOptions{})
-	if err != nil {
-		return err
+	// Delete only if created by the workflow
+	if val, ok := cr.Labels[WfManagedByLabelKey]; ok && val == WfManagedByValue {
+		err = clientset.RbacV1().ClusterRoles().Delete(clusterrole, &metav1.DeleteOptions{})
+		if err != nil {
+			return err
+		}
+		log.Info("Successfully Deleted", "ClusterRole", clusterrole)
+		r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully deleted ClusterRole")
 	}
 
 	return nil
 }
 
 // Create NamespaceRole
-func (r *HealthCheckReconciler) createNameSpaceRole(clientset kubernetes.Interface, nsrole string, namespace string) (string, error) {
+func (r *HealthCheckReconciler) createNameSpaceRole(clientset kubernetes.Interface, log logr.Logger, hc *activemonitorv1alpha1.HealthCheck, nsrole string, namespace string) (string, error) {
 	nsrole1, err := clientset.RbacV1().Roles(namespace).Get(nsrole, metav1.GetOptions{})
 	// If a Namespace Role already exists just re-use it
 	if err == nil {
+		log.Info("Found existing", "NamespaceRole", nsrole1.Name)
+		r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Existing NamespaceRole found")
 		return nsrole1.Name, nil
 	}
 	nsrole1, err = clientset.RbacV1().Roles(namespace).Create(&rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      nsrole,
 			Namespace: namespace,
+			Labels: map[string]string{
+				WfManagedByLabelKey: WfManagedByValue,
+			},
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
@@ -1159,21 +1157,27 @@ func (r *HealthCheckReconciler) createNameSpaceRole(clientset kubernetes.Interfa
 	if err != nil {
 		return "", err
 	}
-
+	log.Info("Successfully Created", "NamespaceRole", nsrole1.Name)
+	r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Created NamespaceRole")
 	return nsrole1.Name, nil
 }
 
 // Create NamespaceRole
-func (r *HealthCheckReconciler) createRemedyNameSpaceRole(clientset kubernetes.Interface, nsrole string, namespace string) (string, error) {
+func (r *HealthCheckReconciler) createRemedyNameSpaceRole(clientset kubernetes.Interface, log logr.Logger, hc *activemonitorv1alpha1.HealthCheck, nsrole string, namespace string) (string, error) {
 	nsrole1, err := clientset.RbacV1().Roles(namespace).Get(nsrole, metav1.GetOptions{})
 	// If a Namespace Role already exists just re-use it
 	if err == nil {
+		log.Info("Found existing", "NamespaceRole", nsrole1.Name)
+		r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Existing NamespaceRole found")
 		return nsrole1.Name, nil
 	}
 	nsrole1, err = clientset.RbacV1().Roles(namespace).Create(&rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      nsrole,
 			Namespace: namespace,
+			Labels: map[string]string{
+				WfManagedByLabelKey: WfManagedByValue,
+			},
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
@@ -1186,37 +1190,48 @@ func (r *HealthCheckReconciler) createRemedyNameSpaceRole(clientset kubernetes.I
 	if err != nil {
 		return "", err
 	}
-
+	log.Info("Successfully Created", "NamespaceRole", nsrole1.Name)
+	r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Created NamespaceRole")
 	return nsrole1.Name, nil
 }
 
 // Delete NamespaceRole
-func (r *HealthCheckReconciler) DeleteNameSpaceRole(clientset kubernetes.Interface, nsrole string, namespace string) error {
+func (r *HealthCheckReconciler) DeleteNameSpaceRole(clientset kubernetes.Interface, log logr.Logger, hc *activemonitorv1alpha1.HealthCheck, nsrole string, namespace string) error {
 	// Check if a Namespace Role already exists
-	_, err := clientset.RbacV1().Roles(namespace).Get(nsrole, metav1.GetOptions{})
+	nr, err := clientset.RbacV1().Roles(namespace).Get(nsrole, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 
-	err = clientset.RbacV1().Roles(namespace).Delete(nsrole, &metav1.DeleteOptions{})
-	if err != nil {
-		return err
+	// Delete only if created by the workflow
+	if val, ok := nr.Labels[WfManagedByLabelKey]; ok && val == WfManagedByValue {
+		err = clientset.RbacV1().Roles(namespace).Delete(nsrole, &metav1.DeleteOptions{})
+		if err != nil {
+			return err
+		}
+		log.Info("Successfully deleted", "NamespaceRole", nsrole)
+		r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully deleted NamespaceRole")
 	}
 
 	return nil
 }
 
 // Create a NamespaceRoleBinding
-func (r *HealthCheckReconciler) createNameSpaceRoleBinding(clientset kubernetes.Interface, rolebinding string, nsrole string, serviceaccount string, namespace string) (string, error) {
+func (r *HealthCheckReconciler) createNameSpaceRoleBinding(clientset kubernetes.Interface, log logr.Logger, hc *activemonitorv1alpha1.HealthCheck, rolebinding string, nsrole string, serviceaccount string, namespace string) (string, error) {
 	nsrb, err := clientset.RbacV1().RoleBindings(namespace).Get(rolebinding, metav1.GetOptions{})
 	// If a Namespace RoleBinding already exists just re-use it
 	if err == nil {
+		log.Info("Found existing", "NamespaceRoleBinding", nsrb.Name)
+		r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Existing NamespaceRoleBinding found")
 		return nsrb.Name, nil
 	}
 	nsrb, err = clientset.RbacV1().RoleBindings(namespace).Create(&rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      rolebinding,
 			Namespace: namespace,
+			Labels: map[string]string{
+				WfManagedByLabelKey: WfManagedByValue,
+			},
 		},
 		Subjects: []rbacv1.Subject{
 			{
@@ -1233,35 +1248,47 @@ func (r *HealthCheckReconciler) createNameSpaceRoleBinding(clientset kubernetes.
 	if err != nil {
 		return "", err
 	}
-
+	log.Info("Successfully Created", "NamespaceRoleBinding", nsrb.Name)
+	r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Created NamespaceRoleBinding")
 	return nsrb.Name, nil
 }
 
 // Delete NamespaceRoleBinding
-func (r *HealthCheckReconciler) DeleteNameSpaceRoleBinding(clientset kubernetes.Interface, rolebinding string, nsrole string, serviceaccount string, namespace string) error {
+func (r *HealthCheckReconciler) DeleteNameSpaceRoleBinding(clientset kubernetes.Interface, log logr.Logger, hc *activemonitorv1alpha1.HealthCheck, rolebinding string, nsrole string, serviceaccount string, namespace string) error {
 	// Check if a Namespace RoleBinding exists
-	_, err := clientset.RbacV1().RoleBindings(namespace).Get(rolebinding, metav1.GetOptions{})
+	nrb, err := clientset.RbacV1().RoleBindings(namespace).Get(rolebinding, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
-	err = clientset.RbacV1().RoleBindings(namespace).Delete(rolebinding, &metav1.DeleteOptions{})
-	if err != nil {
-		return err
+
+	// Delete only if created by the workflow
+	if val, ok := nrb.Labels[WfManagedByLabelKey]; ok && val == WfManagedByValue {
+		err = clientset.RbacV1().RoleBindings(namespace).Delete(rolebinding, &metav1.DeleteOptions{})
+		if err != nil {
+			return err
+		}
+		log.Info("Successfully Deleted", "NamespaceRoleBinding", rolebinding)
+		r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully deleted NamespaceRoleBinding")
 	}
 
 	return nil
 }
 
 // Create a ClusterRoleBinding
-func (r *HealthCheckReconciler) createClusterRoleBinding(clientset kubernetes.Interface, clusterrolebinding string, clusterrole string, serviceaccount string, namespace string) (string, error) {
+func (r *HealthCheckReconciler) createClusterRoleBinding(clientset kubernetes.Interface, log logr.Logger, hc *activemonitorv1alpha1.HealthCheck, clusterrolebinding string, clusterrole string, serviceaccount string, namespace string) (string, error) {
 	crb, err := clientset.RbacV1().ClusterRoleBindings().Get(clusterrolebinding, metav1.GetOptions{})
 	// If a Cluster RoleBinding already exists just re-use it
 	if err == nil {
+		log.Info("Found existing", "ClusterRoleBinding", crb.Name)
+		r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Existing ClusterRoleBinding found")
 		return crb.Name, nil
 	}
 	crb, err = clientset.RbacV1().ClusterRoleBindings().Create(&rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: clusterrolebinding,
+			Labels: map[string]string{
+				WfManagedByLabelKey: WfManagedByValue,
+			},
 		},
 		Subjects: []rbacv1.Subject{
 			{
@@ -1279,22 +1306,28 @@ func (r *HealthCheckReconciler) createClusterRoleBinding(clientset kubernetes.In
 	if err != nil {
 		return "", err
 	}
-
+	log.Info("Successfully Created", "ClusterRoleBinding", crb.Name)
+	r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Created ClusterRoleBinding")
 	return crb.Name, nil
 
 }
 
 // Delete ClusterRoleBinding
-func (r *HealthCheckReconciler) DeleteClusterRoleBinding(clientset kubernetes.Interface, clusterrolebinding string, clusterrole string, serviceaccount string, namespace string) error {
+func (r *HealthCheckReconciler) DeleteClusterRoleBinding(clientset kubernetes.Interface, log logr.Logger, hc *activemonitorv1alpha1.HealthCheck, clusterrolebinding string, clusterrole string, serviceaccount string, namespace string) error {
 	// Check if a Cluster RoleBinding exists
-	_, err := clientset.RbacV1().ClusterRoleBindings().Get(clusterrolebinding, metav1.GetOptions{})
+	crb, err := clientset.RbacV1().ClusterRoleBindings().Get(clusterrolebinding, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 
-	err = clientset.RbacV1().ClusterRoleBindings().Delete(clusterrolebinding, &metav1.DeleteOptions{})
-	if err != nil {
-		return err
+	// Delete only if created by the workflow
+	if val, ok := crb.Labels[WfManagedByLabelKey]; ok && val == WfManagedByValue {
+		err = clientset.RbacV1().ClusterRoleBindings().Delete(clusterrolebinding, &metav1.DeleteOptions{})
+		if err != nil {
+			return err
+		}
+		log.Info("Successfully Deleted", "ClusterRoleBinding", clusterrolebinding)
+		r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully deleted ClusterRoleBinding")
 	}
 
 	return nil
