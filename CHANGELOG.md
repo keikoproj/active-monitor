@@ -80,7 +80,7 @@ Bleeding-edge development, not yet released
 ### Added
 - Initial commit of project
 
-[Unreleased]: https://github.com/keikoproj/active-monitor/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/keikoproj/active-monitor/compare/v0.10.0...HEAD
 [0.10.0]: https://github.com/keikoproj/active-monitor/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/keikoproj/active-monitor/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/keikoproj/active-monitor/compare/v0.7.0...v0.8.0
