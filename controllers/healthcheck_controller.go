@@ -35,6 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -152,6 +153,10 @@ func (r *HealthCheckReconciler) processOrRecoverHealthCheck(ctx context.Context,
 	// Process HealthCheck
 	ret, procErr := r.processHealthCheck(ctx, log, healthCheck)
 	if procErr != nil {
+		// do manual retry without error during "the object has been modified; please apply your changes to the latest version and try again"
+		if r.IsOptimisticLockError(procErr) {
+			return reconcile.Result{RequeueAfter: time.Second * 1}, nil
+		}
 		log.Error(procErr, "Workflow for this healthcheck has an error")
 		if r.IsStorageError(procErr) {
 			// avoid update errors for resources already deleted
@@ -161,6 +166,10 @@ func (r *HealthCheckReconciler) processOrRecoverHealthCheck(ctx context.Context,
 	}
 	err := r.Update(ctx, healthCheck)
 	if err != nil {
+		// do manual retry without error during "the object has been modified; please apply your changes to the latest version and try again"
+		if r.IsOptimisticLockError(err) {
+			return reconcile.Result{RequeueAfter: time.Second * 1}, nil
+		}
 		log.Error(err, "Error updating healthcheck resource")
 		r.Recorder.Event(healthCheck, v1.EventTypeWarning, "Warning", "Error updating healthcheck resource")
 		// Force retry when status fails to update
@@ -1365,4 +1374,11 @@ func (r *HealthCheckReconciler) GetTimerByName(name string) *time.Timer {
 	s := r.RepeatTimersByName[name]
 	r.TimerLock.RUnlock()
 	return s
+}
+
+func (r *HealthCheckReconciler) IsOptimisticLockError(err error) bool {
+	if strings.Contains(err.Error(), registry.OptimisticLockErrorMsg) {
+		return true
+	}
+	return false
 }
