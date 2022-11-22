@@ -153,7 +153,7 @@ func (r *HealthCheckReconciler) processOrRecoverHealthCheck(ctx context.Context,
 	// Process HealthCheck
 	ret, procErr := r.processHealthCheck(ctx, log, healthCheck)
 	if procErr != nil {
-		// do manual retry without error during "the object has been modified; please apply your changes to the latest version and try again"
+		// do retry without error during "the object has been modified; please apply your changes to the latest version and try again"
 		if r.IsOptimisticLockError(procErr) {
 			return reconcile.Result{RequeueAfter: time.Second * 1}, nil
 		}
@@ -166,7 +166,7 @@ func (r *HealthCheckReconciler) processOrRecoverHealthCheck(ctx context.Context,
 	}
 	err := r.Update(ctx, healthCheck)
 	if err != nil {
-		// do manual retry without error during "the object has been modified; please apply your changes to the latest version and try again"
+		// do retry without error during "the object has been modified; please apply your changes to the latest version and try again"
 		if r.IsOptimisticLockError(err) {
 			return reconcile.Result{RequeueAfter: time.Second * 1}, nil
 		}

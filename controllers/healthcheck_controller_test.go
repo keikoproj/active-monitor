@@ -2,8 +2,11 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"io/ioutil"
+	"testing"
 	"time"
 
 	activemonitorv1alpha1 "github.com/keikoproj/active-monitor/api/v1alpha1"
@@ -162,4 +165,60 @@ func parseHealthCheckYaml(data []byte) (*activemonitorv1alpha1.HealthCheck, erro
 	}
 
 	return a, nil
+}
+
+func (r *HealthCheckReconciler) TestHealthCheckReconciler_IsStorageError(t *testing.T) {
+	type test struct {
+		name string
+		err  error
+		want bool
+	}
+	table := []test{
+		{
+			name: "got storage error",
+			err:  errors.New("Operation cannot be fulfilled on pods: StorageError: invalid object, Code: 4, UID in object meta: "),
+			want: true,
+		},
+		{
+			name: "no storage error",
+			err:  errors.New("Reconciler error"),
+			want: false,
+		},
+	}
+	for _, tt := range table {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := r.IsStorageError(tt.err)
+			require.Equal(t, got, tt.want)
+		})
+	}
+}
+
+func (r *HealthCheckReconciler) TestHealthCheckReconciler_IsOptimisticLockError(t *testing.T) {
+	type test struct {
+		name string
+		err  error
+		want bool
+	}
+	table := []test{
+		{
+			name: "got optimistic lock error",
+			err:  errors.New("Operation cannot be fulfilled on healthchecks.activemonitor.keikoproj.io: the object has been modified; please apply your changes to the latest version and try again"),
+			want: true,
+		},
+		{
+			name: "no optimistic lock error",
+			err:  errors.New("Reconciler error"),
+			want: false,
+		},
+	}
+	for _, tt := range table {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := r.IsOptimisticLockError(tt.err)
+			require.Equal(t, got, tt.want)
+		})
+	}
 }
