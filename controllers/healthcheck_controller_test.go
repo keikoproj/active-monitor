@@ -167,7 +167,9 @@ func parseHealthCheckYaml(data []byte) (*activemonitorv1alpha1.HealthCheck, erro
 	return a, nil
 }
 
-func (r *HealthCheckReconciler) TestHealthCheckReconciler_IsStorageError(t *testing.T) {
+func TestHealthCheckReconciler_IsStorageError(t *testing.T) {
+	c := &HealthCheckReconciler{}
+
 	type test struct {
 		name string
 		err  error
@@ -189,13 +191,15 @@ func (r *HealthCheckReconciler) TestHealthCheckReconciler_IsStorageError(t *test
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := r.IsStorageError(tt.err)
+			got := c.IsStorageError(tt.err)
 			require.Equal(t, got, tt.want)
 		})
 	}
 }
 
-func (r *HealthCheckReconciler) TestHealthCheckReconciler_IsOptimisticLockError(t *testing.T) {
+func TestHealthCheckReconciler_IsOptimisticLockError(t *testing.T) {
+	c := &HealthCheckReconciler{}
+
 	type test struct {
 		name string
 		err  error
@@ -217,7 +221,7 @@ func (r *HealthCheckReconciler) TestHealthCheckReconciler_IsOptimisticLockError(
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := r.IsOptimisticLockError(tt.err)
+			got := c.IsOptimisticLockError(tt.err)
 			require.Equal(t, got, tt.want)
 		})
 	}
