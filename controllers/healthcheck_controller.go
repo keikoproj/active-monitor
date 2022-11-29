@@ -16,6 +16,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"k8s.io/client-go/util/retry"
 	"strings"
 	"sync"
 	"time"
@@ -35,7 +36,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -153,10 +153,6 @@ func (r *HealthCheckReconciler) processOrRecoverHealthCheck(ctx context.Context,
 	// Process HealthCheck
 	ret, procErr := r.processHealthCheck(ctx, log, healthCheck)
 	if procErr != nil {
-		// do retry without error during "the object has been modified; please apply your changes to the latest version and try again"
-		if r.IsOptimisticLockError(procErr) {
-			return reconcile.Result{RequeueAfter: time.Second * 1}, nil
-		}
 		log.Error(procErr, "Workflow for this healthcheck has an error")
 		if r.IsStorageError(procErr) {
 			// avoid update errors for resources already deleted
@@ -164,14 +160,20 @@ func (r *HealthCheckReconciler) processOrRecoverHealthCheck(ctx context.Context,
 		}
 		return reconcile.Result{RequeueAfter: 1 * time.Second}, procErr
 	}
-	err := r.Update(ctx, healthCheck)
-	if err != nil {
-		// do retry without error during "the object has been modified; please apply your changes to the latest version and try again"
-		if r.IsOptimisticLockError(err) {
-			return reconcile.Result{RequeueAfter: time.Second * 1}, nil
+
+	var healthCheckNew activemonitorv1alpha1.HealthCheck
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		if err := r.Get(ctx, client.ObjectKey{Name: healthCheck.Name, Namespace: healthCheck.Namespace}, &healthCheckNew); err != nil {
+			return err
 		}
+		healthCheckNew.Status = healthCheck.Status
+		err := r.Update(ctx, &healthCheckNew)
+		return err
+	})
+
+	if err != nil {
 		log.Error(err, "Error updating healthcheck resource")
-		r.Recorder.Event(healthCheck, v1.EventTypeWarning, "Warning", "Error updating healthcheck resource")
+		r.Recorder.Event(&healthCheckNew, v1.EventTypeWarning, "Warning", "Error updating healthcheck resource")
 		// Force retry when status fails to update
 		return ctrl.Result{}, err
 	}
@@ -1344,7 +1346,16 @@ func (r *HealthCheckReconciler) DeleteClusterRoleBinding(clientset kubernetes.In
 }
 
 func (r *HealthCheckReconciler) updateHealthCheckStatus(ctx context.Context, log logr.Logger, hc *activemonitorv1alpha1.HealthCheck) error {
-	if err := r.Status().Update(ctx, hc); err != nil {
+	var hcNew activemonitorv1alpha1.HealthCheck
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		if err := r.Get(ctx, client.ObjectKey{Name: hc.Name, Namespace: hc.Namespace}, &hcNew); err != nil {
+			return err
+		}
+		hcNew.Status = hc.Status
+		err := r.Status().Update(ctx, &hcNew)
+		return err
+	})
+	if err != nil {
 		log.Error(err, "HealthCheck status could not be updated.")
 		r.Recorder.Event(hc, "Warning", "Failed", fmt.Sprintf("HealthCheck %s/%s status could not be updated. %v", hc.Namespace, hc.Name, err))
 		return err
@@ -1374,11 +1385,4 @@ func (r *HealthCheckReconciler) GetTimerByName(name string) *time.Timer {
 	s := r.RepeatTimersByName[name]
 	r.TimerLock.RUnlock()
 	return s
-}
-
-func (r *HealthCheckReconciler) IsOptimisticLockError(err error) bool {
-	if strings.Contains(err.Error(), registry.OptimisticLockErrorMsg) {
-		return true
-	}
-	return false
 }

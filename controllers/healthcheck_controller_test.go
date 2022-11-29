@@ -149,50 +149,6 @@ var _ = Describe("Active-Monitor Controller", func() {
 			Expect(instance.Status.ErrorMessage).ShouldNot(BeEmpty())
 		})
 	})
-
-	Describe("optimistic lock errors should be nil", func() {
-		var instance *activemonitorv1alpha1.HealthCheck
-
-		It("instance should be parsable", func() {
-			healthCheckYaml, err := ioutil.ReadFile("../examples/bdd/inlineHelloWithRepeatTest.yaml")
-			Expect(err).ToNot(HaveOccurred())
-
-			instance, err = parseHealthCheckYaml(healthCheckYaml)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(instance).To(BeAssignableToTypeOf(&activemonitorv1alpha1.HealthCheck{}))
-			Expect(instance.GetName()).To(Equal(healthCheckNamePause))
-		})
-
-		It("instance should be reconciled", func() {
-			instance.SetNamespace(healthCheckNamespace)
-			err := k8sClient.Create(context.TODO(), instance)
-			if apierrors.IsInvalid(err) {
-				log.Error(err, "failed to create object, got an invalid object error")
-				return
-			}
-			err = k8sClient.Update(context.TODO(), instance)
-			if apierrors.IsInvalid(err) {
-				log.Error(err, "failed to update object, got an invalid object error")
-				return
-			}
-			Expect(err).ToNot(HaveOccurred())
-			defer k8sClient.Delete(context.TODO(), instance)
-
-			Eventually(func() error {
-				if err := k8sClient.Get(context.TODO(), healthCheckKeyPause, instance); err != nil {
-					return err
-				}
-
-				if instance.Status.Status == "Failed" {
-					return nil
-				}
-				return fmt.Errorf("HealthCheck is not valid")
-			}, timeout).Should(Succeed())
-
-			By("Verify healthCheck has been reconciled by checking for status")
-			Expect(instance.Status.ErrorMessage).ShouldNot(BeEmpty())
-		})
-	})
 })
 
 func parseHealthCheckYaml(data []byte) (*activemonitorv1alpha1.HealthCheck, error) {
@@ -236,36 +192,6 @@ func TestHealthCheckReconciler_IsStorageError(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := c.IsStorageError(tt.err)
-			require.Equal(t, got, tt.want)
-		})
-	}
-}
-
-func TestHealthCheckReconciler_IsOptimisticLockError(t *testing.T) {
-	c := &HealthCheckReconciler{}
-
-	type test struct {
-		name string
-		err  error
-		want bool
-	}
-	table := []test{
-		{
-			name: "got optimistic lock error",
-			err:  errors.New("Operation cannot be fulfilled on healthchecks.activemonitor.keikoproj.io: the object has been modified; please apply your changes to the latest version and try again"),
-			want: true,
-		},
-		{
-			name: "no optimistic lock error",
-			err:  errors.New("Reconciler error"),
-			want: false,
-		},
-	}
-	for _, tt := range table {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := c.IsOptimisticLockError(tt.err)
 			require.Equal(t, got, tt.want)
 		})
 	}

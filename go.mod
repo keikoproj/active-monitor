@@ -18,7 +18,6 @@ require (
 	gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776
 	k8s.io/api v0.17.2
 	k8s.io/apimachinery v0.17.2
-	k8s.io/apiserver v0.17.2
 	k8s.io/client-go v0.17.2
 	sigs.k8s.io/controller-runtime v0.5.0
 )
@@ -28,9 +27,6 @@ require (
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
 	github.com/beorn7/perks v1.0.0 // indirect
-	github.com/blang/semver v3.5.0+incompatible // indirect
-	github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e // indirect
-	github.com/coreos/pkg v0.0.0-20180108230652-97fdf19511ea // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/emicklei/go-restful v2.9.6+incompatible // indirect
 	github.com/evanphx/json-patch v4.5.0+incompatible // indirect
@@ -46,7 +42,6 @@ require (
 	github.com/google/gofuzz v1.0.0 // indirect
 	github.com/google/uuid v1.1.1 // indirect
 	github.com/googleapis/gnostic v0.3.1 // indirect
-	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/hashicorp/golang-lru v0.5.1 // indirect
 	github.com/hpcloud/tail v1.0.0 // indirect
 	github.com/imdario/mergo v0.3.6 // indirect
@@ -62,7 +57,6 @@ require (
 	github.com/prometheus/common v0.4.1 // indirect
 	github.com/prometheus/procfs v0.0.2 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738 // indirect
 	go.uber.org/atomic v1.3.2 // indirect
 	go.uber.org/multierr v1.1.0 // indirect
 	go.uber.org/zap v1.10.0 // indirect
@@ -74,14 +68,11 @@ require (
 	golang.org/x/xerrors v0.0.0-20190717185122-a985d3407aa7 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.0.1 // indirect
 	google.golang.org/appengine v1.5.0 // indirect
-	google.golang.org/genproto v0.0.0-20190502173448-54afdca5d873 // indirect
-	google.golang.org/grpc v1.23.1 // indirect
 	gopkg.in/fsnotify.v1 v1.4.7 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v2 v2.2.4 // indirect
 	k8s.io/apiextensions-apiserver v0.17.2 // indirect
-	k8s.io/component-base v0.17.2 // indirect
 	k8s.io/klog v1.0.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20191107075043-30be4d16710a // indirect
 	k8s.io/utils v0.0.0-20191218082557-f07c713de883 // indirect
