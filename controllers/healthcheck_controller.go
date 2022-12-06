@@ -16,6 +16,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"k8s.io/client-go/util/retry"
 	"strings"
 	"sync"
 	"time"
@@ -159,10 +160,20 @@ func (r *HealthCheckReconciler) processOrRecoverHealthCheck(ctx context.Context,
 		}
 		return reconcile.Result{RequeueAfter: 1 * time.Second}, procErr
 	}
-	err := r.Update(ctx, healthCheck)
+
+	var healthCheckNew activemonitorv1alpha1.HealthCheck
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		if err := r.Get(ctx, client.ObjectKey{Name: healthCheck.Name, Namespace: healthCheck.Namespace}, &healthCheckNew); err != nil {
+			return err
+		}
+		healthCheckNew.Status = healthCheck.Status
+		err := r.Update(ctx, &healthCheckNew)
+		return err
+	})
+
 	if err != nil {
 		log.Error(err, "Error updating healthcheck resource")
-		r.Recorder.Event(healthCheck, v1.EventTypeWarning, "Warning", "Error updating healthcheck resource")
+		r.Recorder.Event(&healthCheckNew, v1.EventTypeWarning, "Warning", "Error updating healthcheck resource")
 		// Force retry when status fails to update
 		return ctrl.Result{}, err
 	}
@@ -1335,7 +1346,16 @@ func (r *HealthCheckReconciler) DeleteClusterRoleBinding(clientset kubernetes.In
 }
 
 func (r *HealthCheckReconciler) updateHealthCheckStatus(ctx context.Context, log logr.Logger, hc *activemonitorv1alpha1.HealthCheck) error {
-	if err := r.Status().Update(ctx, hc); err != nil {
+	var hcNew activemonitorv1alpha1.HealthCheck
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		if err := r.Get(ctx, client.ObjectKey{Name: hc.Name, Namespace: hc.Namespace}, &hcNew); err != nil {
+			return err
+		}
+		hcNew.Status = hc.Status
+		err := r.Status().Update(ctx, &hcNew)
+		return err
+	})
+	if err != nil {
 		log.Error(err, "HealthCheck status could not be updated.")
 		r.Recorder.Event(hc, "Warning", "Failed", fmt.Sprintf("HealthCheck %s/%s status could not be updated. %v", hc.Namespace, hc.Name, err))
 		return err
