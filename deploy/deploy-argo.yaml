@@ -956,10 +956,22 @@ rules:
       - clusterworkflowtemplates/finalizers
       - workflowtasksets
       - workflowtasksets/finalizers
-      - workflowtaskresults
     verbs:
       - get
       - list
+      - watch
+  - apiGroups:
+    - argoproj.io
+    resources:
+      - workflowtaskresults
+    verbs:
+      - create
+      - delete
+      - deletecollection
+      - get
+      - list
+      - patch
+      - update
       - watch
   - apiGroups:
       - coordination.k8s.io
@@ -1019,6 +1031,7 @@ rules:
       - update
       - patch
       - delete
+      - deletecollection
       - create
   - apiGroups:
       - argoproj.io
