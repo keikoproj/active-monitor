@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 Bleeding-edge development, not yet released
 
-## [0.11.0] - 2022-11-28
+## [0.11.0] - 2022-12-07
+## Updated
+- Update workflow-controller and argoexec version to v3.4.4 - #132
 ## Fixed
 - Rbac and optimistic lock issues - #129
 
