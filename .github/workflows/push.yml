@@ -10,7 +10,7 @@ jobs:
   push:
     name: push
     if: github.repository_owner == 'keikoproj'
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-22.04
     steps:
 
       - name: Check out code into the Go module directory
