@@ -654,6 +654,9 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 		// reschedule next run of workflow
 		helper := r.createSubmitWorkflowHelper(ctx, log, wfNamespace, hc)
 		r.TimerLock.Lock()
+		if t, ok := r.RepeatTimersByName[hc.GetName()]; ok {
+			log.Info("Stopping timer for previous workflow", "name", wfName, "stop status", t.Stop())
+		}
 		r.RepeatTimersByName[hc.GetName()] = time.AfterFunc(time.Duration(repeatAfterSec)*time.Second, helper)
 		r.TimerLock.Unlock()
 		log.Info("Rescheduled workflow for next run", "namespace", wfNamespace, "name", wfName)
@@ -1031,7 +1034,7 @@ func (r *HealthCheckReconciler) createServiceAccount(clientset kubernetes.Interf
 	return sa.Name, nil
 }
 
-//Delete a service Account
+// Delete a service Account
 func (r *HealthCheckReconciler) DeleteServiceAccount(clientset kubernetes.Interface, log logr.Logger, hc *activemonitorv1alpha1.HealthCheck, name string, namespace string) error {
 	sa, err := clientset.CoreV1().ServiceAccounts(namespace).Get(name, metav1.GetOptions{})
 	// If a service account already exists just re-use it
