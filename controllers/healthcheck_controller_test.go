@@ -60,7 +60,7 @@ var _ = Describe("Active-Monitor Controller", func() {
 					return err
 				}
 
-				if instance.Status.StartedAt != nil {
+				if instance.Status.StartedAt != nil && instance.Status.SuccessCount+instance.Status.FailedCount >= 3 {
 					return nil
 				}
 				return fmt.Errorf("HealthCheck is not valid")
