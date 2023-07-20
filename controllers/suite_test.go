@@ -16,11 +16,11 @@ limitations under the License.
 package controllers
 
 import (
+	"context"
 	"github.com/go-logr/logr"
 	"k8s.io/client-go/rest"
 	"path/filepath"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sync"
@@ -45,14 +45,12 @@ var k8sClient client.Client
 var testEnv *envtest.Environment
 
 var mgr manager.Manager
-var stopMgr chan struct{}
+var ctx = context.Background()
 var wg *sync.WaitGroup
 var log logr.Logger
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
-
-	RunSpecsWithDefaultAndCustomReporters(t, "Controller Suite", []Reporter{printer.NewlineReporter{}})
 }
 
 var _ = BeforeSuite(func(done Done) {
@@ -89,14 +87,14 @@ var _ = BeforeSuite(func(done Done) {
 	err = NewHealthCheckReconciler(mgr, ctrl.Log.WithName("controllers").WithName("HealthCheck"), 10).SetupWithManager(mgr)
 	Expect(err).ToNot(HaveOccurred())
 
-	stopMgr, wg = StartTestManager(mgr)
+	wg = StartTestManager(mgr)
 
 	close(done)
 }, 90)
 
 var _ = AfterSuite(func() {
 	By("stopping manager")
-	close(stopMgr)
+	ctx.Done()
 	wg.Wait()
 
 	By("tearing down the test environment")
@@ -104,14 +102,13 @@ var _ = AfterSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 })
 
-func StartTestManager(mgr manager.Manager) (chan struct{}, *sync.WaitGroup) {
-	stop := make(chan struct{})
+func StartTestManager(mgr manager.Manager) *sync.WaitGroup {
 	wg := &sync.WaitGroup{}
 	go func() {
 		wg.Add(1)
 		//mgr.Start(stop)
-		Expect(mgr.Start(stop)).ToNot(HaveOccurred())
+		Expect(mgr.Start(ctx)).ToNot(HaveOccurred())
 		wg.Done()
 	}()
-	return stop, wg
+	return wg
 }

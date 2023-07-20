@@ -16,8 +16,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"github.com/onsi/ginkgo/reporters"
 	"path/filepath"
-	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
@@ -42,12 +42,12 @@ func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
 	RunSpecsWithDefaultAndCustomReporters(t,
-		"Controller Suite",
-		[]Reporter{printer.NewlineReporter{}})
+		"Controller Suite", []Reporter{reporters.NewFakeReporter()},
+	)
 }
 
 var _ = BeforeSuite(func(done Done) {
-	logf.SetLogger(zap.LoggerTo(GinkgoWriter, true))
+	logf.SetLogger(zap.New(zap.UseDevMode(true), zap.WriteTo(GinkgoWriter)))
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{

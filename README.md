@@ -10,7 +10,7 @@
 [![Go Report Card][GoReportImg]][GoReportUrl]
 
 ## Motivation
-Active-Monitor is a Kubernetes custom resource controller which enables deep cluster monitoring and self-healing using [Argo workflows](https://github.com/argoproj/argo).
+Active-Monitor is a Kubernetes custom resource controller which enables deep cluster monitoring and self-healing using [Argo workflows](https://github.com/argoproj/argo-workflows).
 
 While it is not too difficult to know that all entities in a cluster are running individually, it is often quite challenging to know that they can all coordinate with each other as required for successful cluster operation (network connectivity, volume access, etc).
 
@@ -49,7 +49,7 @@ When the `level` is set to be `Cluster` the Active-Monitor will create a `Servic
 * Kubernetes command line tool (kubectl)
 * Access to Kubernetes Cluster as specified in `~/.kube/config`
   * Easiest option is to install [minikube](https://minikube.sigs.k8s.io/docs/start/) and ensure that `kubectl version` returns client and server info
-* [Argo Workflows Controller](https://github.com/argoproj/argo)
+* [Argo Workflows Controller](https://github.com/argoproj/argo-workflows)
 
 ## Installation Guide
 ```
