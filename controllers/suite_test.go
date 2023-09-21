@@ -16,24 +16,27 @@ limitations under the License.
 package controllers
 
 import (
-	"github.com/go-logr/logr"
-	"k8s.io/client-go/rest"
+	"context"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"path/filepath"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sync"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	"github.com/go-logr/logr"
 	activemonitorv1alpha1 "github.com/keikoproj/active-monitor/api/v1alpha1"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
+	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -45,14 +48,13 @@ var k8sClient client.Client
 var testEnv *envtest.Environment
 
 var mgr manager.Manager
-var stopMgr chan struct{}
+var ctx = context.Background()
 var wg *sync.WaitGroup
 var log logr.Logger
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
-
-	RunSpecsWithDefaultAndCustomReporters(t, "Controller Suite", []Reporter{printer.NewlineReporter{}})
+	RunSpecsWithCustomReporters(t, "Controller Suite", []Reporter{printer.NewlineReporter{}})
 }
 
 var _ = BeforeSuite(func(done Done) {
@@ -77,6 +79,8 @@ var _ = BeforeSuite(func(done Done) {
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).ToNot(HaveOccurred())
 	Expect(k8sClient).ToNot(BeNil())
+	err = k8sClient.Create(context.Background(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "health"}})
+	Expect(err).To(BeNil())
 
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
 		Scheme:             scheme.Scheme,
@@ -89,29 +93,27 @@ var _ = BeforeSuite(func(done Done) {
 	err = NewHealthCheckReconciler(mgr, ctrl.Log.WithName("controllers").WithName("HealthCheck"), 10).SetupWithManager(mgr)
 	Expect(err).ToNot(HaveOccurred())
 
-	stopMgr, wg = StartTestManager(mgr)
+	wg = StartTestManager(mgr)
 
 	close(done)
 }, 90)
 
 var _ = AfterSuite(func() {
 	By("stopping manager")
-	close(stopMgr)
-	wg.Wait()
+	ctx.Done()
 
 	By("tearing down the test environment")
 	err := testEnv.Stop()
 	Expect(err).ToNot(HaveOccurred())
 })
 
-func StartTestManager(mgr manager.Manager) (chan struct{}, *sync.WaitGroup) {
-	stop := make(chan struct{})
+func StartTestManager(mgr manager.Manager) *sync.WaitGroup {
 	wg := &sync.WaitGroup{}
 	go func() {
 		wg.Add(1)
 		//mgr.Start(stop)
-		Expect(mgr.Start(stop)).ToNot(HaveOccurred())
+		Expect(mgr.Start(ctx)).ToNot(HaveOccurred())
 		wg.Done()
 	}()
-	return stop, wg
+	return wg
 }
