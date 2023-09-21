@@ -4,10 +4,10 @@
 [![PR](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)][GithubPrsUrl]
 [![slack](https://img.shields.io/badge/slack-join%20the%20conversation-ff69b4.svg)][SlackUrl]
 
-![version](https://img.shields.io/badge/version-0.12.0-blue.svg?cacheSeconds=2592000)
-[![Build Status][BuildStatusImg]][BuildMasterUrl]
-[![codecov][CodecovImg]][CodecovUrl]
 [![Go Report Card][GoReportImg]][GoReportUrl]
+[![Build Status][BuildStatusImg]][BuildMasterUrl]
+[![Code Coverage][CodecovImg]][CodecovUrl]
+[![Latest Version][VersionImg]][VersionUrl]
 
 ## Motivation
 Active-Monitor is a Kubernetes custom resource controller which enables deep cluster monitoring and self-healing using [Argo workflows](https://github.com/argoproj/argo-workflows).
@@ -310,7 +310,8 @@ The Apache 2 license is used in this project. Details can be found in the [LICEN
 [Minion Manager][MinionManagerUrl] -
 [Governor][GovernorUrl]
 
-<!-- URLs -->
+
+<!-- Markdown links -->
 [InstanceManagerUrl]: https://github.com/keikoproj/instance-manager
 [KubeForensicsUrl]: https://github.com/keikoproj/kube-forensics
 [AddonManagerUrl]: https://github.com/keikoproj/addon-manager
@@ -322,11 +323,14 @@ The Apache 2 license is used in this project. Details can be found in the [LICEN
 [GithubPrsUrl]: https://github.com/keikoproj/active-monitor/pulls
 [SlackUrl]: https://keikoproj.slack.com/app_redirect?channel=active-monitor
 
-[BuildStatusImg]: https://travis-ci.org/keikoproj/active-monitor.svg?branch=master
-[BuildMasterUrl]: https://travis-ci.org/keikoproj/active-monitor
+[GoReportImg]: https://goreportcard.com/badge/github.com/keikoproj/active-monitor
+[GoReportUrl]: https://goreportcard.com/report/github.com/keikoproj/active-monitor
+
+[BuildStatusImg]: https://github.com/keikoproj/active-monitor/actions/workflows/unit-test.yaml/badge.svg?branch=master
+[BuildMasterUrl]: https://github.com/keikoproj/active-monitor/actions/workflows/unit-test.yaml
 
 [CodecovImg]: https://codecov.io/gh/keikoproj/active-monitor/branch/master/graph/badge.svg
 [CodecovUrl]: https://codecov.io/gh/keikoproj/active-monitor
 
-[GoReportImg]: https://goreportcard.com/badge/github.com/keikoproj/active-monitor
-[GoReportUrl]: https://goreportcard.com/report/github.com/keikoproj/active-monitor
+[VersionImg]: https://img.shields.io/github/v/release/keikoproj/active-monitor
+[VersionUrl]: https://github.com/keikoproj/active-monitor/releases
