@@ -9,6 +9,13 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
+    ignore:
+      - dependency-name: "k8s.io*" ## K8s module version updates should be done explicitly
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "sigs.k8s.io*" ## K8s module version updates should be done explicitly
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "*" ## Major version updates should be done explicitly
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -19,3 +26,5 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
+    ignore:
+      - dependency-name: "golang" ## Golang version should be done explicitly
