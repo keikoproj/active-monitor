@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 Bleeding-edge development, not yet released
 
+## [0.12.0] - 2023-09-21
+## Updated
+- chore: upgrade kubernetes dependencies to support upto k8s 1.25 - #146
+- Update to Golang 1.19 (#150)
+- Bump k8s.io/client-go from 0.17.2 to 0.17.16 (#149)
+- Bump github.com/prometheus/client_golang from 1.0.0 to 1.11.1 (#136)
+- Bump golang.org/x/net from 0.0.0-20191004110552-13f9640d40b9 to 0.7.0 (#138)
+- Bump gopkg.in/yaml.v3 from 3.0.0-20200615113413-eeeca48fe776 to 3.0.0 (#147)
+- Bump github.com/gogo/protobuf (#148)
+- Bump golang.org/x/crypto from 0.0.0-20190820162420-60c769a6c586 to 0.1.0 (#139)
+- Bump golang.org/x/text from 0.3.2 to 0.3.8 (#137)
+- Bump github.com/emicklei/go-restful (#135)
+
 ## [0.11.2] - 2023-04-05
 ## Updated
 - feat: enable multi-architecture container image builds - #144
