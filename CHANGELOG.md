@@ -8,17 +8,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Bleeding-edge development, not yet released
 
 ## [0.12.0] - 2023-09-21
-## Updated
-- chore: upgrade kubernetes dependencies to support upto k8s 1.25 - #146
-- Update to Golang 1.19 (#150)
-- Bump k8s.io/client-go from 0.17.2 to 0.17.16 (#149)
-- Bump github.com/prometheus/client_golang from 1.0.0 to 1.11.1 (#136)
-- Bump golang.org/x/net from 0.0.0-20191004110552-13f9640d40b9 to 0.7.0 (#138)
-- Bump gopkg.in/yaml.v3 from 3.0.0-20200615113413-eeeca48fe776 to 3.0.0 (#147)
-- Bump github.com/gogo/protobuf (#148)
-- Bump golang.org/x/crypto from 0.0.0-20190820162420-60c769a6c586 to 0.1.0 (#139)
-- Bump golang.org/x/text from 0.3.2 to 0.3.8 (#137)
-- Bump github.com/emicklei/go-restful (#135)
+### Updated
+* Bump github.com/emicklei/go-restful from 2.9.6+incompatible to 2.16.0+incompatible by @dependabot in https://github.com/keikoproj/active-monitor/pull/135
+* Bump golang.org/x/text from 0.3.2 to 0.3.8 by @dependabot in https://github.com/keikoproj/active-monitor/pull/137
+* Bump golang.org/x/crypto from 0.0.0-20190820162420-60c769a6c586 to 0.1.0 by @dependabot in https://github.com/keikoproj/active-monitor/pull/139
+* Bump github.com/gogo/protobuf from 1.2.2-0.20190723190241-65acae22fc9d to 1.3.2 by @dependabot in https://github.com/keikoproj/active-monitor/pull/148
+* Bump gopkg.in/yaml.v3 from 3.0.0-20200615113413-eeeca48fe776 to 3.0.0 by @dependabot in https://github.com/keikoproj/active-monitor/pull/147
+* Bump golang.org/x/net from 0.0.0-20191004110552-13f9640d40b9 to 0.7.0 by @dependabot in https://github.com/keikoproj/active-monitor/pull/138
+* Bump github.com/prometheus/client_golang from 1.0.0 to 1.11.1 by @dependabot in https://github.com/keikoproj/active-monitor/pull/136
+* Bump k8s.io/client-go from 0.17.2 to 0.17.16 by @dependabot in https://github.com/keikoproj/active-monitor/pull/149
+* Update to Golang 1.19 by @tekenstam in https://github.com/keikoproj/active-monitor/pull/150
+* chore: upgrade kubernetes dependencies to support upto k8s 1.25 by @rkilingr in https://github.com/keikoproj/active-monitor/pull/146
+* Fix dependabot config by @tekenstam in https://github.com/keikoproj/active-monitor/pull/153
+* Remove Travis CI config and update badges in README by @tekenstam in https://github.com/keikoproj/active-monitor/pull/165
+* Bump actions/checkout from 2 to 4 by @dependabot in https://github.com/keikoproj/active-monitor/pull/154
+* Bump docker/setup-buildx-action from 1 to 3 by @dependabot in https://github.com/keikoproj/active-monitor/pull/157
+* Bump docker/build-push-action from 2 to 5 by @dependabot in https://github.com/keikoproj/active-monitor/pull/158
+* Bump docker/setup-qemu-action from 1 to 3 by @dependabot in https://github.com/keikoproj/active-monitor/pull/159
+* Update to docker/metadata-action@v5 by @tekenstam in https://github.com/keikoproj/active-monitor/pull/166
+* Improve the Dependabot configuration by @tekenstam in https://github.com/keikoproj/active-monitor/pull/167
+* Bump github.com/keikoproj/inverse-exp-backoff from 0.0.0-20201007213207-e4a3ac0f74ab to 0.0.3 by @dependabot in https://github.com/keikoproj/active-monitor/pull/161
+* Bump golang.org/x/net from 0.10.0 to 0.15.0 by @dependabot in https://github.com/keikoproj/active-monitor/pull/160
+* Bump github.com/sirupsen/logrus from 1.9.2 to 1.9.3 by @dependabot in https://github.com/keikoproj/active-monitor/pull/163
+* Bump github.com/argoproj/argo-workflows/v3 from 3.4.8 to 3.4.11 by @dependabot in https://github.com/keikoproj/active-monitor/pull/164
+* Bump docker/login-action from 1 to 3 by @dependabot in https://github.com/keikoproj/active-monitor/pull/168
+* Bump actions/setup-go from 2 to 4 by @dependabot in https://github.com/keikoproj/active-monitor/pull/169
+
+### New Contributors
+* @dependabot made their first contribution in https://github.com/keikoproj/active-monitor/pull/135
+* @tekenstam made their first contribution in https://github.com/keikoproj/active-monitor/pull/150
+
+**Full Changelog**: https://github.com/keikoproj/active-monitor/compare/v0.11.2...v0.12.0
 
 ## [0.11.2] - 2023-04-05
 ## Updated
