@@ -16,10 +16,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"k8s.io/client-go/util/retry"
 	"strings"
 	"sync"
 	"time"
+
+	"k8s.io/client-go/util/retry"
 
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -211,7 +212,7 @@ func (r *HealthCheckReconciler) processHealthCheck(ctx context.Context, log logr
 				log.Error(err, "fail to parse cron")
 				r.Recorder.Event(healthCheck, v1.EventTypeWarning, "Warning", "Fail to parse cron")
 			}
-			// The value from schedule next and substracting from current time is in fraction as we convert to int it will be 1 less than
+			// The value from schedule next and subtracting from current time is in fraction as we convert to int it will be 1 less than
 			// the intended reschedule so we need to add 1sec to get the actual value
 			// we need to update the spec so have to healthCheck.Spec.RepeatAfterSec instead of local variable hcSpec
 			healthCheck.Spec.RepeatAfterSec = int(schedule.Next(time.Now()).Sub(time.Now())/time.Second) + 1
@@ -728,7 +729,7 @@ func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctr
 		if ok {
 			log.Info("Remedy workflow status", "status", status["phase"])
 			if status["phase"] == succStr {
-				r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Remedy workflow status is Succceeded")
+				r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Remedy workflow status is Succeeded")
 				hc.Status.RemedyStatus = succStr
 				hc.Status.RemedyStartedAt = &then
 				hc.Status.RemedyFinishedAt = &now
