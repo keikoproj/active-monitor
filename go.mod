@@ -9,7 +9,7 @@ require (
 	github.com/keikoproj/inverse-exp-backoff v0.0.3
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onsi/ginkgo v1.16.5
-	github.com/onsi/gomega v1.27.10
+	github.com/onsi/gomega v1.28.0
 	github.com/prometheus/client_golang v1.16.0
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/sirupsen/logrus v1.9.3
