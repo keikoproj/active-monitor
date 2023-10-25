@@ -20,13 +20,13 @@ jobs:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v4
 
-      - name: Get kubebuilder
-        run: |
-          make kubebuilder
+      # - name: Get kubebuilder
+      #   run: |
+      #     make kubebuilder
 
       - name: Build
         run: |
-          make manager
+          make all
 
       - name: Test
         run: |
@@ -35,4 +35,4 @@ jobs:
       - name: Upload to Codecov
         uses: codecov/codecov-action@v3
         with:
-          files: ./coverage.txt
+          files: ./cover.out
