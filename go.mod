@@ -1,6 +1,6 @@
 module github.com/keikoproj/active-monitor
 
-go 1.19
+go 1.21
 
 require (
 	github.com/argoproj/argo-workflows/v3 v3.4.11
