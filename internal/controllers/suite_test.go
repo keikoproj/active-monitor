@@ -17,11 +17,12 @@ package controllers
 
 import (
 	"context"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"path/filepath"
 	"sync"
 	"testing"
+
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -33,7 +34,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
-	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -54,49 +54,53 @@ var log logr.Logger
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecsWithCustomReporters(t, "Controller Suite", []Reporter{printer.NewlineReporter{}})
+	RunSpecs(t, "Controller Suite")
 }
 
-var _ = BeforeSuite(func(done Done) {
-	log = zap.New(zap.UseDevMode(true), zap.WriteTo(GinkgoWriter))
-	logf.SetLogger(log)
+var _ = BeforeSuite(func() {
+	done := make(chan interface{})
+	go func() {
+		log = zap.New(zap.UseDevMode(true), zap.WriteTo(GinkgoWriter))
+		logf.SetLogger(log)
 
-	By("bootstrapping test environment")
-	testEnv = &envtest.Environment{
-		CRDDirectoryPaths: []string{filepath.Join("..", "config", "crd", "bases")},
-	}
+		By("bootstrapping test environment")
+		testEnv = &envtest.Environment{
+			CRDDirectoryPaths: []string{filepath.Join("..", "config", "crd", "bases")},
+		}
 
-	cfg, err := testEnv.Start()
-	Expect(err).ToNot(HaveOccurred())
-	Expect(cfg).ToNot(BeNil())
+		cfg, err := testEnv.Start()
+		Expect(err).ToNot(HaveOccurred())
+		Expect(cfg).ToNot(BeNil())
 
-	err = activemonitorv1alpha1.AddToScheme(scheme.Scheme)
-	Expect(err).NotTo(HaveOccurred())
+		err = activemonitorv1alpha1.AddToScheme(scheme.Scheme)
+		Expect(err).NotTo(HaveOccurred())
 
-	// +kubebuilder:scaffold:scheme
+		// +kubebuilder:scaffold:scheme
 
-	By("starting reconciler and manager")
-	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
-	Expect(err).ToNot(HaveOccurred())
-	Expect(k8sClient).ToNot(BeNil())
-	err = k8sClient.Create(context.Background(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "health"}})
-	Expect(err).To(BeNil())
+		By("starting reconciler and manager")
+		k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(k8sClient).ToNot(BeNil())
+		err = k8sClient.Create(context.Background(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "health"}})
+		Expect(err).To(BeNil())
 
-	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
-		Scheme:             scheme.Scheme,
-		MetricsBindAddress: ":8080",
-		LeaderElection:     false,
-	})
-	Expect(err).ToNot(HaveOccurred())
-	Expect(mgr).ToNot(BeNil())
+		mgr, err := ctrl.NewManager(cfg, ctrl.Options{
+			Scheme:             scheme.Scheme,
+			MetricsBindAddress: ":8080",
+			LeaderElection:     false,
+		})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(mgr).ToNot(BeNil())
 
-	err = NewHealthCheckReconciler(mgr, ctrl.Log.WithName("controllers").WithName("HealthCheck"), 10).SetupWithManager(mgr)
-	Expect(err).ToNot(HaveOccurred())
+		err = NewHealthCheckReconciler(mgr, ctrl.Log.WithName("controllers").WithName("HealthCheck"), 10).SetupWithManager(mgr)
+		Expect(err).ToNot(HaveOccurred())
 
-	wg = StartTestManager(mgr)
+		wg = StartTestManager(mgr)
 
-	close(done)
-}, 90)
+		close(done) //signifies the code is done
+	}()
+	Eventually(done, 60).Should(BeClosed())
+})
 
 var _ = AfterSuite(func() {
 	By("stopping manager")
