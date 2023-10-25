@@ -17,18 +17,22 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/go-logr/logr"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/go-logr/logr"
 	activemonitorv1alpha1 "github.com/keikoproj/active-monitor/api/v1alpha1"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -36,88 +40,148 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 	// +kubebuilder:scaffold:imports
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
-var cfg *rest.Config
-var k8sClient client.Client
-var testEnv *envtest.Environment
+var (
+	cfg       *rest.Config
+	k8sClient client.Client
+	testEnv   *envtest.Environment
+	ctx       context.Context
+	cancel    context.CancelFunc
+)
 
-var mgr manager.Manager
-var ctx = context.Background()
+// var mgr manager.Manager
+
+// var ctx = context.Background()
 var wg *sync.WaitGroup
 var log logr.Logger
 
-func TestAPIs(t *testing.T) {
+func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
+
 	RunSpecs(t, "Controller Suite")
 }
 
 var _ = BeforeSuite(func() {
-	done := make(chan interface{})
+	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+
+	ctx, cancel = context.WithCancel(context.TODO())
+
+	By("bootstrapping test environment")
+	testEnv = &envtest.Environment{
+		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
+		ErrorIfCRDPathMissing: true,
+
+		// The BinaryAssetsDirectory is only required if you want to run the tests directly
+		// without call the makefile target test. If not informed it will look for the
+		// default path defined in controller-runtime which is /usr/local/kubebuilder/.
+		// Note that you must have the required binaries setup under the bin directory to perform
+		// the tests directly. When we run make test it will be setup and used automatically.
+		BinaryAssetsDirectory: filepath.Join("..", "..", "bin", "k8s",
+			fmt.Sprintf("1.28.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
+	}
+
+	var err error
+	// cfg is defined in this file globally.
+	cfg, err = testEnv.Start()
+	Expect(err).NotTo(HaveOccurred())
+	Expect(cfg).NotTo(BeNil())
+
+	err = activemonitorv1alpha1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	//+kubebuilder:scaffold:scheme
+
+	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
+	Expect(err).NotTo(HaveOccurred())
+	Expect(k8sClient).NotTo(BeNil())
+
+	// Create "health" namespace for testing
+	err = k8sClient.Create(context.Background(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "health"}})
+	Expect(err).To(BeNil())
+
+	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
+		Scheme: scheme.Scheme,
+	})
+	Expect(err).ToNot(HaveOccurred())
+
+	err = (&HealthCheckReconciler{
+		Client:     k8sManager.GetClient(),
+		DynClient:  dynamic.NewForConfigOrDie(k8sManager.GetConfig()),
+		Recorder:   k8sManager.GetEventRecorderFor("HealthCheck"),
+		kubeclient: kubernetes.NewForConfigOrDie(k8sManager.GetConfig()),
+		Log:        log,
+		// MaxParallel: MaxParallel,
+		TimerLock: sync.RWMutex{},
+	}).SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
 	go func() {
-		log = zap.New(zap.UseDevMode(true), zap.WriteTo(GinkgoWriter))
-		logf.SetLogger(log)
-
-		By("bootstrapping test environment")
-		testEnv = &envtest.Environment{
-			CRDDirectoryPaths: []string{filepath.Join("..", "config", "crd", "bases")},
-		}
-
-		cfg, err := testEnv.Start()
-		Expect(err).ToNot(HaveOccurred())
-		Expect(cfg).ToNot(BeNil())
-
-		err = activemonitorv1alpha1.AddToScheme(scheme.Scheme)
-		Expect(err).NotTo(HaveOccurred())
-
-		// +kubebuilder:scaffold:scheme
-
-		By("starting reconciler and manager")
-		k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
-		Expect(err).ToNot(HaveOccurred())
-		Expect(k8sClient).ToNot(BeNil())
-		err = k8sClient.Create(context.Background(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "health"}})
-		Expect(err).To(BeNil())
-
-		mgr, err := ctrl.NewManager(cfg, ctrl.Options{
-			Scheme:             scheme.Scheme,
-			MetricsBindAddress: ":8080",
-			LeaderElection:     false,
-		})
-		Expect(err).ToNot(HaveOccurred())
-		Expect(mgr).ToNot(BeNil())
-
-		err = NewHealthCheckReconciler(mgr, ctrl.Log.WithName("controllers").WithName("HealthCheck"), 10).SetupWithManager(mgr)
-		Expect(err).ToNot(HaveOccurred())
-
-		wg = StartTestManager(mgr)
-
-		close(done) //signifies the code is done
+		defer GinkgoRecover()
+		err = k8sManager.Start(ctx)
+		Expect(err).ToNot(HaveOccurred(), "failed to run manager")
 	}()
-	Eventually(done, 60).Should(BeClosed())
+
+	// done := make(chan interface{})
+	// go func() {
+	// 	log = zap.New(zap.UseDevMode(true), zap.WriteTo(GinkgoWriter))
+	// 	logf.SetLogger(log)
+
+	// 	cfg, err := testEnv.Start()
+	// 	Expect(err).ToNot(HaveOccurred())
+	// 	Expect(cfg).ToNot(BeNil())
+
+	// 	err = activemonitorv1alpha1.AddToScheme(scheme.Scheme)
+	// 	Expect(err).NotTo(HaveOccurred())
+
+	// 	// +kubebuilder:scaffold:scheme
+
+	// 	By("starting reconciler and manager")
+	// 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
+	// 	Expect(err).ToNot(HaveOccurred())
+	// 	Expect(k8sClient).ToNot(BeNil())
+	// 	err = k8sClient.Create(context.Background(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "health"}})
+	// 	Expect(err).To(BeNil())
+
+	// 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
+	// 		Scheme:         scheme.Scheme,
+	// 		Metrics:        ":8080",
+	// 		LeaderElection: false,
+	// 	})
+	// 	Expect(err).ToNot(HaveOccurred())
+	// 	Expect(mgr).ToNot(BeNil())
+
+	// 	err = NewHealthCheckReconciler(mgr, ctrl.Log.WithName("controllers").WithName("HealthCheck"), 10).SetupWithManager(mgr)
+	// 	Expect(err).ToNot(HaveOccurred())
+
+	// 	wg = StartTestManager(mgr)
+
+	// 	close(done) //signifies the code is done
+	// }()
+	// Eventually(done, 60).Should(BeClosed())
 })
 
 var _ = AfterSuite(func() {
 	By("stopping manager")
 	ctx.Done()
+	cancel()
 
 	By("tearing down the test environment")
 	err := testEnv.Stop()
-	Expect(err).ToNot(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 })
 
-func StartTestManager(mgr manager.Manager) *sync.WaitGroup {
-	wg := &sync.WaitGroup{}
-	go func() {
-		wg.Add(1)
-		//mgr.Start(stop)
-		Expect(mgr.Start(ctx)).ToNot(HaveOccurred())
-		wg.Done()
-	}()
-	return wg
-}
+// func StartTestManager(mgr manager.Manager) *sync.WaitGroup {
+// 	wg := &sync.WaitGroup{}
+// 	go func() {
+// 		wg.Add(1)
+// 		//mgr.Start(stop)
+// 		Expect(mgr.Start(ctx)).ToNot(HaveOccurred())
+// 		wg.Done()
+// 	}()
+// 	return wg
+// }
