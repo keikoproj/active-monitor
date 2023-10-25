@@ -50,7 +50,7 @@ var _ = Describe("Active-Monitor Controller", func() {
 			instance.SetNamespace(healthCheckNamespace)
 			err := k8sClient.Create(context.TODO(), instance)
 			if apierrors.IsInvalid(err) {
-				// log.Error(err, "failed to create object, got an invalid object error")
+				log.Error(err, "failed to create object, got an invalid object error")
 				return
 			}
 			Expect(err).NotTo(HaveOccurred())
@@ -90,7 +90,7 @@ var _ = Describe("Active-Monitor Controller", func() {
 			instance.SetNamespace(healthCheckNamespace)
 			err := k8sClient.Create(context.TODO(), instance)
 			if apierrors.IsInvalid(err) {
-				// log.Error(err, "failed to create object, got an invalid object error")
+				log.Error(err, "failed to create object, got an invalid object error")
 				return
 			}
 			Expect(err).NotTo(HaveOccurred())
@@ -129,7 +129,7 @@ var _ = Describe("Active-Monitor Controller", func() {
 			instance.SetNamespace(healthCheckNamespace)
 			err := k8sClient.Create(context.TODO(), instance)
 			if apierrors.IsInvalid(err) {
-				// log.Error(err, "failed to create object, got an invalid object error")
+				log.Error(err, "failed to create object, got an invalid object error")
 				return
 			}
 			Expect(err).NotTo(HaveOccurred())

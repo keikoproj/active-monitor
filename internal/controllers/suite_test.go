@@ -54,9 +54,6 @@ var (
 	cancel    context.CancelFunc
 )
 
-// var mgr manager.Manager
-
-// var ctx = context.Background()
 var wg *sync.WaitGroup
 var log logr.Logger
 
@@ -115,8 +112,7 @@ var _ = BeforeSuite(func() {
 		Recorder:   k8sManager.GetEventRecorderFor("HealthCheck"),
 		kubeclient: kubernetes.NewForConfigOrDie(k8sManager.GetConfig()),
 		Log:        log,
-		// MaxParallel: MaxParallel,
-		TimerLock: sync.RWMutex{},
+		TimerLock:  sync.RWMutex{},
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
@@ -125,44 +121,6 @@ var _ = BeforeSuite(func() {
 		err = k8sManager.Start(ctx)
 		Expect(err).ToNot(HaveOccurred(), "failed to run manager")
 	}()
-
-	// done := make(chan interface{})
-	// go func() {
-	// 	log = zap.New(zap.UseDevMode(true), zap.WriteTo(GinkgoWriter))
-	// 	logf.SetLogger(log)
-
-	// 	cfg, err := testEnv.Start()
-	// 	Expect(err).ToNot(HaveOccurred())
-	// 	Expect(cfg).ToNot(BeNil())
-
-	// 	err = activemonitorv1alpha1.AddToScheme(scheme.Scheme)
-	// 	Expect(err).NotTo(HaveOccurred())
-
-	// 	// +kubebuilder:scaffold:scheme
-
-	// 	By("starting reconciler and manager")
-	// 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
-	// 	Expect(err).ToNot(HaveOccurred())
-	// 	Expect(k8sClient).ToNot(BeNil())
-	// 	err = k8sClient.Create(context.Background(), &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "health"}})
-	// 	Expect(err).To(BeNil())
-
-	// 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
-	// 		Scheme:         scheme.Scheme,
-	// 		Metrics:        ":8080",
-	// 		LeaderElection: false,
-	// 	})
-	// 	Expect(err).ToNot(HaveOccurred())
-	// 	Expect(mgr).ToNot(BeNil())
-
-	// 	err = NewHealthCheckReconciler(mgr, ctrl.Log.WithName("controllers").WithName("HealthCheck"), 10).SetupWithManager(mgr)
-	// 	Expect(err).ToNot(HaveOccurred())
-
-	// 	wg = StartTestManager(mgr)
-
-	// 	close(done) //signifies the code is done
-	// }()
-	// Eventually(done, 60).Should(BeClosed())
 })
 
 var _ = AfterSuite(func() {
@@ -174,14 +132,3 @@ var _ = AfterSuite(func() {
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 })
-
-// func StartTestManager(mgr manager.Manager) *sync.WaitGroup {
-// 	wg := &sync.WaitGroup{}
-// 	go func() {
-// 		wg.Add(1)
-// 		//mgr.Start(stop)
-// 		Expect(mgr.Start(ctx)).ToNot(HaveOccurred())
-// 		wg.Done()
-// 	}()
-// 	return wg
-// }
