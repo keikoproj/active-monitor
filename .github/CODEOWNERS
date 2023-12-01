@@ -5,3 +5,7 @@
 # The following owners will be requested for
 # review when someone opens a pull request.
 *       @keikoproj/authorized-approvers
+
+# Admins own root and CI.
+.github/** @keikoproj/keiko-admins @keikoproj/keiko-maintainers
+/*     @keikoproj/keiko-admins @keikoproj/keiko-maintainers
