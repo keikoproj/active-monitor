@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	activemonitorv1alpha1 "github.com/keikoproj/active-monitor/api/v1alpha1"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gopkg.in/yaml.v3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -37,7 +38,7 @@ var _ = Describe("Active-Monitor Controller", func() {
 		var instance *activemonitorv1alpha1.HealthCheck
 		It("instance should be parsable", func() {
 			//healthCheckYaml, err := ioutil.ReadFile("../examples/inlineHello.yaml")
-			healthCheckYaml, err := ioutil.ReadFile("../examples/bdd/inlineMemoryRemedyUnitTest.yaml")
+			healthCheckYaml, err := ioutil.ReadFile("../../examples/bdd/inlineMemoryRemedyUnitTest.yaml")
 			Expect(err).ToNot(HaveOccurred())
 			instance, err = parseHealthCheckYaml(healthCheckYaml)
 			Expect(err).ToNot(HaveOccurred())
@@ -76,7 +77,7 @@ var _ = Describe("Active-Monitor Controller", func() {
 
 		It("instance should be parsable", func() {
 			//healthCheckYaml, err := ioutil.ReadFile("../examples/inlineHello.yaml")
-			healthCheckYaml, err := ioutil.ReadFile("../examples/bdd/inlineMemoryRemedyUnitTest_Namespace.yaml")
+			healthCheckYaml, err := ioutil.ReadFile("../../examples/bdd/inlineMemoryRemedyUnitTest_Namespace.yaml")
 			Expect(err).ToNot(HaveOccurred())
 
 			instance, err = parseHealthCheckYaml(healthCheckYaml)
@@ -115,7 +116,7 @@ var _ = Describe("Active-Monitor Controller", func() {
 		var instance *activemonitorv1alpha1.HealthCheck
 
 		It("instance should be parsable", func() {
-			healthCheckYaml, err := ioutil.ReadFile("../examples/bdd/inlineHelloTest.yaml")
+			healthCheckYaml, err := ioutil.ReadFile("../../examples/bdd/inlineHelloTest.yaml")
 			Expect(err).ToNot(HaveOccurred())
 
 			instance, err = parseHealthCheckYaml(healthCheckYaml)
