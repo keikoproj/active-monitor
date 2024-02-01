@@ -2,28 +2,9 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
+  creationTimestamp: null
   name: manager-role
 rules:
-- apiGroups:
-  - activemonitor.keikoproj.io
-  resources:
-  - healthchecks
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - activemonitor.keikoproj.io
-  resources:
-  - healthchecks/status
-  verbs:
-  - get
-  - patch
-  - update
 - apiGroups:
   - activemonitor.keikoproj.io.my.domain
   resources:
@@ -50,18 +31,3 @@ rules:
   - get
   - patch
   - update
-- apiGroups:
-  - argoproj.io
-  resources:
-  - workflow
-  - workflows
-  - workflowtaskresults
-  - workflowtasksets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch

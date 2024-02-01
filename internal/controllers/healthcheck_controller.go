@@ -43,8 +43,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	activemonitorv1alpha1 "github.com/keikoproj/active-monitor/api/v1alpha1"
-	"github.com/keikoproj/active-monitor/metrics"
-	"github.com/keikoproj/active-monitor/store"
+	"github.com/keikoproj/active-monitor/internal/metrics"
+	"github.com/keikoproj/active-monitor/internal/store"
 	iebackoff "github.com/keikoproj/inverse-exp-backoff"
 )
 
