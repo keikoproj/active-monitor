@@ -16,6 +16,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -128,7 +129,7 @@ func (r *HealthCheckReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		r.RepeatTimersByName = make(map[string]*time.Timer)
 	}
 
-	var healthCheck = &activemonitorv1alpha1.HealthCheck{}
+	healthCheck := &activemonitorv1alpha1.HealthCheck{}
 	if err := r.Get(ctx, req.NamespacedName, healthCheck); err != nil {
 		// if our healthcheck was deleted, this Reconcile method is invoked with an empty resource cache
 		// see: https://book.kubebuilder.io/cronjob-tutorial/controller-implementation.html#1-load-the-cronjob-by-name
@@ -170,7 +171,6 @@ func (r *HealthCheckReconciler) processOrRecoverHealthCheck(ctx context.Context,
 		err := r.Update(ctx, &healthCheckNew)
 		return err
 	})
-
 	if err != nil {
 		log.Error(err, "Error updating healthcheck resource")
 		r.Recorder.Event(&healthCheckNew, v1.EventTypeWarning, "Warning", "Error updating healthcheck resource")
@@ -297,7 +297,6 @@ func (r *HealthCheckReconciler) createRBACForWorkflow(ctx context.Context, log l
 		}
 	}
 	if level == healthCheckClusterLevel {
-
 		if workFlowType != remedy {
 			_, err := r.createClusterRole(ctx, r.kubeclient, log, hc, amclusterRole)
 			if err != nil {
@@ -327,9 +326,7 @@ func (r *HealthCheckReconciler) createRBACForWorkflow(ctx context.Context, log l
 				return err
 			}
 		}
-
 	} else if level == healthCheckNamespaceLevel {
-
 		if workFlowType != remedy {
 			_, err := r.createNameSpaceRole(ctx, r.kubeclient, log, hc, amnsRole, wfNamespace)
 			if err != nil {
@@ -358,7 +355,6 @@ func (r *HealthCheckReconciler) createRBACForWorkflow(ctx context.Context, log l
 				return err
 			}
 		}
-
 	} else {
 		r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "level is not set")
 		return errors.New("level is not set")
@@ -513,17 +509,31 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 	var now metav1.Time
 	then := metav1.Time{Time: time.Now()}
 	repeatAfterSec := hc.Spec.RepeatAfterSec
-	maxTime := time.Duration(hc.Spec.Workflow.Timeout/2) * time.Second
-	if maxTime <= 0 {
-		maxTime = time.Second
+	var maxTime time.Duration
+	if hc.Spec.BackoffMax == 0 {
+		maxTime = time.Duration(hc.Spec.Workflow.Timeout/2) * time.Second
+		if maxTime <= 0 {
+			maxTime = time.Second
+		}
+	} else {
+		maxTime = time.Duration(hc.Spec.BackoffMax) * time.Second
 	}
 	minTime := time.Duration(hc.Spec.Workflow.Timeout/60) * time.Second
 	if minTime <= 0 {
 		minTime = time.Second
 	}
+	factor := 0.5
+	if hc.Spec.BackoffFactor != "" {
+		val, err := strconv.ParseFloat(hc.Spec.BackoffFactor, 64)
+		if err != nil {
+			log.Error(err, "Error converting BackoffFactor string to float", err)
+		} else {
+			factor = val
+		}
+	}
 	timeout := time.Duration(hc.Spec.Workflow.Timeout) * time.Second
 	log.Info("IEB with timeout times are", "maxTime:", maxTime, "minTime:", minTime, "timeout:", timeout)
-	for ieTimer, err1 := iebackoff.NewIEBWithTimeout(maxTime, minTime, timeout, 0.5, time.Now()); ; err1 = ieTimer.Next() {
+	for ieTimer, err1 := iebackoff.NewIEBWithTimeout(maxTime, minTime, timeout, factor, time.Now()); ; err1 = ieTimer.Next() {
 		now = metav1.Time{Time: time.Now()}
 		// grab workflow object by name and check its status; update healthcheck accordingly
 		// do this once per second until the workflow reaches a terminal state (success/failure)
@@ -531,6 +541,7 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 		if err != nil {
 			// if the workflow wasn't found, it is most likely the case that its parent healthcheck was deleted
 			// we can swallow this error and simply not reschedule
+			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error attempting to find workflow for healthcheck. This may indicate that either the healthcheck was removed or the Workflow was GC'd before active-monitor could obtain the status")
 			return ignoreNotFound(err)
 		}
 		status, ok := workflow.UnstructuredContent()["status"].(map[string]interface{})
@@ -666,7 +677,6 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 }
 
 func (r *HealthCheckReconciler) processRemedyWorkflow(ctx context.Context, log logr.Logger, wfNamespace string, hc *activemonitorv1alpha1.HealthCheck) error {
-
 	log.Info("Creating Remedy Workflow", "namespace", wfNamespace, "generateNamePrefix", hc.Spec.RemedyWorkflow.GenerateName)
 	err := r.createRBACForWorkflow(ctx, log, hc, remedy)
 	if err != nil {
@@ -820,7 +830,7 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 			r.workflowLabels = make(map[string]string)
 		}
 
-		//assign instanceId labels to workflows
+		// assign instanceId labels to workflows
 		if wflabels == nil {
 			r.workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
 		} else {
@@ -842,7 +852,7 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 			r.workflowLabels = make(map[string]string)
 		}
 
-		//assign instanceId labels to workflows
+		// assign instanceId labels to workflows
 		r.workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
 		m1 := metadata{generateName: hc.Spec.Workflow.GenerateName, labels: r.workflowLabels}
 		data["metadata"] = m1
@@ -929,7 +939,7 @@ func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logg
 			r.workflowLabels = make(map[string]string)
 		}
 
-		//assign instanceId labels to workflows
+		// assign instanceId labels to workflows
 		if wflabels == nil {
 			r.workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
 		} else {
@@ -951,7 +961,7 @@ func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logg
 			r.workflowLabels = make(map[string]string)
 		}
 
-		//assign instanceId labels to workflows
+		// assign instanceId labels to workflows
 		r.workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
 		m1 := metadata{generateName: hc.Spec.Workflow.GenerateName, labels: r.workflowLabels}
 		data["metadata"] = m1
@@ -1073,14 +1083,12 @@ func (r *HealthCheckReconciler) createClusterRole(ctx context.Context, clientset
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
-
 				APIGroups: []string{"*"},
 				Resources: []string{"*"},
 				Verbs:     []string{"get", "list", "watch"},
 			},
 		},
 	}, metav1.CreateOptions{})
-
 	if err != nil {
 		return "", err
 	}
@@ -1113,7 +1121,6 @@ func (r *HealthCheckReconciler) createRemedyClusterRole(ctx context.Context, cli
 			},
 		},
 	}, metav1.CreateOptions{})
-
 	if err != nil {
 		return "", err
 	}
@@ -1323,7 +1330,6 @@ func (r *HealthCheckReconciler) createClusterRoleBinding(ctx context.Context, cl
 	log.Info("Successfully Created", "ClusterRoleBinding", crb.Name)
 	r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Successfully Created ClusterRoleBinding")
 	return crb.Name, nil
-
 }
 
 // Delete ClusterRoleBinding
@@ -1345,7 +1351,6 @@ func (r *HealthCheckReconciler) DeleteClusterRoleBinding(ctx context.Context, cl
 	}
 
 	return nil
-
 }
 
 func (r *HealthCheckReconciler) updateHealthCheckStatus(ctx context.Context, log logr.Logger, hc *activemonitorv1alpha1.HealthCheck) error {
