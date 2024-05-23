@@ -37,6 +37,7 @@ type HealthCheckSpec struct {
 	RemedyWorkflow      RemedyWorkflow `json:"remedyworkflow,omitempty"`
 	BackoffFactor       string         `json:"backoffFactor,omitempty"`
 	BackoffMax          int            `json:"backoffMax,omitempty"`
+	BackoffMin          int            `json:"backoffMin,omitempty"`
 	RemedyRunsLimit     int            `json:"remedyRunsLimit,omitempty"`
 	RemedyResetInterval int            `json:"remedyResetInterval,omitempty"`
 }

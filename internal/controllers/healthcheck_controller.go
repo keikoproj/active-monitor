@@ -509,7 +509,10 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 	var now metav1.Time
 	then := metav1.Time{Time: time.Now()}
 	repeatAfterSec := hc.Spec.RepeatAfterSec
-	var maxTime time.Duration
+	var (
+		maxTime time.Duration
+		minTime time.Duration
+	)
 	if hc.Spec.BackoffMax == 0 {
 		maxTime = time.Duration(hc.Spec.Workflow.Timeout/2) * time.Second
 		if maxTime <= 0 {
@@ -518,15 +521,21 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 	} else {
 		maxTime = time.Duration(hc.Spec.BackoffMax) * time.Second
 	}
-	minTime := time.Duration(hc.Spec.Workflow.Timeout/60) * time.Second
-	if minTime <= 0 {
-		minTime = time.Second
+	if hc.Spec.BackoffMin == 0 {
+		minTime = time.Duration(hc.Spec.Workflow.Timeout/60) * time.Second
+		if minTime <= 0 {
+			minTime = time.Second
+		}
+	} else {
+		minTime = time.Duration(hc.Spec.BackoffMin)
 	}
+
 	factor := 0.5
+
 	if hc.Spec.BackoffFactor != "" {
 		val, err := strconv.ParseFloat(hc.Spec.BackoffFactor, 64)
 		if err != nil {
-			log.Error(err, "Error converting BackoffFactor string to float", err)
+			log.Error(err, "Error converting BackoffFactor string to float; defaulting to 0.5", err)
 		} else {
 			factor = val
 		}
