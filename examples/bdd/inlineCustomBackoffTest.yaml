@@ -13,6 +13,7 @@ spec:
   backoffMax: 2
   workflow:
     generateName: inline-hello-
+    windowtimeout: 1200
     resource:
       namespace: health # workflow will be submitted in this ns
       serviceAccount: activemonitor-controller-sa # workflow will be submitted using this acct
