@@ -58,6 +58,12 @@ spec:
               Either RepeatAfterSec or Schedule must be defined for the health check
               to run
             properties:
+              backoffFactor:
+                type: string
+              backoffMax:
+                type: integer
+              backoffMin:
+                type: integer
               description:
                 type: string
               level:

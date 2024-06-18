@@ -1,0 +1,38 @@
+apiVersion: activemonitor.keikoproj.io/v1alpha1
+kind: HealthCheck
+metadata:
+  name: inline-hello-custom-retry
+  generateName: inline-hello-
+  namespace: health
+spec:
+  schedule:
+    cron: "@every 3s"
+  level: cluster
+  backoffFactor: "0.1"
+  backoffMin: 1
+  backoffMax: 2
+  workflow:
+    generateName: inline-hello-
+    windowtimeout: 1200
+    resource:
+      namespace: health # workflow will be submitted in this ns
+      serviceAccount: activemonitor-controller-sa # workflow will be submitted using this acct
+      source:
+        inline: |
+          apiVersion: argoproj.io/v1alpha1
+          kind: Workflow
+          metadata:
+            labels:
+              workflows.argoproj.io/controller-instanceid: activemonitor-workflows
+            generateName: hello-world-
+          spec:
+            entrypoint: whalesay
+            templates:
+              -
+                container:
+                  args:
+                    - "hello world"
+                  command:
+                    - cowsay
+                  image: "docker/whalesay:latest"
+                name: whalesay
