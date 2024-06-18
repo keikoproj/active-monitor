@@ -28,16 +28,17 @@ var (
 	healthCheckKeyNs     = types.NamespacedName{Name: healthCheckNameNs, Namespace: healthCheckNamespace}
 	healthCheckNamePause = "inline-hello-pause"
 	healthCheckKeyPause  = types.NamespacedName{Name: healthCheckNamePause, Namespace: healthCheckNamespace}
+	healthCheckNameRetry = "inline-hello-custom-retry"
+	healthCheckKeyRetry  = types.NamespacedName{Name: healthCheckNameRetry, Namespace: healthCheckNamespace}
 )
 
 const timeout = time.Second * 60
 
 var _ = Describe("Active-Monitor Controller", func() {
-
 	Describe("healthCheck CR can be reconciled at cluster level", func() {
 		var instance *activemonitorv1alpha1.HealthCheck
 		It("instance should be parsable", func() {
-			//healthCheckYaml, err := ioutil.ReadFile("../examples/inlineHello.yaml")
+			// healthCheckYaml, err := ioutil.ReadFile("../examples/inlineHello.yaml")
 			healthCheckYaml, err := ioutil.ReadFile("../../examples/bdd/inlineMemoryRemedyUnitTest.yaml")
 			Expect(err).ToNot(HaveOccurred())
 			instance, err = parseHealthCheckYaml(healthCheckYaml)
@@ -76,7 +77,7 @@ var _ = Describe("Active-Monitor Controller", func() {
 		var instance *activemonitorv1alpha1.HealthCheck
 
 		It("instance should be parsable", func() {
-			//healthCheckYaml, err := ioutil.ReadFile("../examples/inlineHello.yaml")
+			// healthCheckYaml, err := ioutil.ReadFile("../examples/inlineHello.yaml")
 			healthCheckYaml, err := ioutil.ReadFile("../../examples/bdd/inlineMemoryRemedyUnitTest_Namespace.yaml")
 			Expect(err).ToNot(HaveOccurred())
 
@@ -141,6 +142,45 @@ var _ = Describe("Active-Monitor Controller", func() {
 				}
 
 				if instance.Status.Status == "Stopped" {
+					return nil
+				}
+				return fmt.Errorf("HealthCheck is not valid")
+			}, timeout).Should(Succeed())
+
+			By("Verify healthCheck has been reconciled by checking for status")
+			Expect(instance.Status.ErrorMessage).ShouldNot(BeEmpty())
+		})
+	})
+
+	Describe("healthCheck CR will properly parse backoff customizations", func() {
+		var instance *activemonitorv1alpha1.HealthCheck
+
+		It("instance should be parsable", func() {
+			healthCheckYaml, err := ioutil.ReadFile("../../examples/bdd/inlineCustomBackoffTest.yaml")
+			Expect(err).ToNot(HaveOccurred())
+
+			instance, err = parseHealthCheckYaml(healthCheckYaml)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(instance).To(BeAssignableToTypeOf(&activemonitorv1alpha1.HealthCheck{}))
+			Expect(instance.GetName()).To(Equal(healthCheckNameRetry))
+		})
+
+		It("instance should be reconciled", func() {
+			instance.SetNamespace(healthCheckNamespace)
+			err := k8sClient.Create(context.TODO(), instance)
+			if apierrors.IsInvalid(err) {
+				log.Error(err, "failed to create object, got an invalid object error")
+				return
+			}
+			Expect(err).NotTo(HaveOccurred())
+			defer k8sClient.Delete(context.TODO(), instance)
+
+			Eventually(func() error {
+				if err := k8sClient.Get(context.TODO(), healthCheckKeyRetry, instance); err != nil {
+					return err
+				}
+
+				if instance.Status.StartedAt != nil {
 					return nil
 				}
 				return fmt.Errorf("HealthCheck is not valid")

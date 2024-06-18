@@ -16,8 +16,9 @@ limitations under the License.
 package v1alpha1
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"reflect"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -34,6 +35,9 @@ type HealthCheckSpec struct {
 	Level               string         `json:"level,omitempty"`    // defines if a workflow runs in a Namespace or Cluster level
 	Schedule            ScheduleSpec   `json:"schedule,omitempty"` // Schedule defines schedule rules to run HealthCheck
 	RemedyWorkflow      RemedyWorkflow `json:"remedyworkflow,omitempty"`
+	BackoffFactor       string         `json:"backoffFactor,omitempty"`
+	BackoffMax          int            `json:"backoffMax,omitempty"`
+	BackoffMin          int            `json:"backoffMin,omitempty"`
 	RemedyRunsLimit     int            `json:"remedyRunsLimit,omitempty"`
 	RemedyResetInterval int            `json:"remedyResetInterval,omitempty"`
 }
