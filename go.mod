@@ -6,7 +6,7 @@ require (
 	github.com/argoproj/argo-workflows/v3 v3.5.8
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-logr/logr v1.4.1
-	github.com/keikoproj/inverse-exp-backoff v0.0.3
+	github.com/keikoproj/inverse-exp-backoff v0.0.4
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onsi/ginkgo/v2 v2.19.0
 	github.com/onsi/gomega v1.33.1
