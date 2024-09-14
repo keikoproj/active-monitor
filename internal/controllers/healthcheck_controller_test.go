@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"testing"
 	"time"
 
@@ -38,8 +38,7 @@ var _ = Describe("Active-Monitor Controller", func() {
 	Describe("healthCheck CR can be reconciled at cluster level", func() {
 		var instance *activemonitorv1alpha1.HealthCheck
 		It("instance should be parsable", func() {
-			// healthCheckYaml, err := ioutil.ReadFile("../examples/inlineHello.yaml")
-			healthCheckYaml, err := ioutil.ReadFile("../../examples/bdd/inlineMemoryRemedyUnitTest.yaml")
+			healthCheckYaml, err := os.ReadFile("../../examples/bdd/inlineMemoryRemedyUnitTest.yaml")
 			Expect(err).ToNot(HaveOccurred())
 			instance, err = parseHealthCheckYaml(healthCheckYaml)
 			Expect(err).ToNot(HaveOccurred())
@@ -77,8 +76,8 @@ var _ = Describe("Active-Monitor Controller", func() {
 		var instance *activemonitorv1alpha1.HealthCheck
 
 		It("instance should be parsable", func() {
-			// healthCheckYaml, err := ioutil.ReadFile("../examples/inlineHello.yaml")
-			healthCheckYaml, err := ioutil.ReadFile("../../examples/bdd/inlineMemoryRemedyUnitTest_Namespace.yaml")
+			// healthCheckYaml, err := os.ReadFile("../examples/inlineHello.yaml")
+			healthCheckYaml, err := os.ReadFile("../../examples/bdd/inlineMemoryRemedyUnitTest_Namespace.yaml")
 			Expect(err).ToNot(HaveOccurred())
 
 			instance, err = parseHealthCheckYaml(healthCheckYaml)
@@ -117,7 +116,7 @@ var _ = Describe("Active-Monitor Controller", func() {
 		var instance *activemonitorv1alpha1.HealthCheck
 
 		It("instance should be parsable", func() {
-			healthCheckYaml, err := ioutil.ReadFile("../../examples/bdd/inlineHelloTest.yaml")
+			healthCheckYaml, err := os.ReadFile("../../examples/bdd/inlineHelloTest.yaml")
 			Expect(err).ToNot(HaveOccurred())
 
 			instance, err = parseHealthCheckYaml(healthCheckYaml)
@@ -156,7 +155,7 @@ var _ = Describe("Active-Monitor Controller", func() {
 		var instance *activemonitorv1alpha1.HealthCheck
 
 		It("instance should be parsable", func() {
-			healthCheckYaml, err := ioutil.ReadFile("../../examples/bdd/inlineCustomBackoffTest.yaml")
+			healthCheckYaml, err := os.ReadFile("../../examples/bdd/inlineCustomBackoffTest.yaml")
 			Expect(err).ToNot(HaveOccurred())
 
 			instance, err = parseHealthCheckYaml(healthCheckYaml)

@@ -189,6 +189,7 @@ func (r *HealthCheckReconciler) processHealthCheck(ctx context.Context, log logr
 		var finishedAtTime int64
 		if healthCheck.Status.FinishedAt != nil {
 			finishedAtTime = healthCheck.Status.FinishedAt.Time.Unix()
+			log.Info("FinishedAtTime", "finishedAtTime", finishedAtTime)
 		}
 
 		// workflows can be paused by setting repeatAfterSec to <= 0 and not specifying the schedule for cron.
@@ -217,8 +218,8 @@ func (r *HealthCheckReconciler) processHealthCheck(ctx context.Context, log logr
 			// we need to update the spec so have to healthCheck.Spec.RepeatAfterSec instead of local variable hcSpec
 			healthCheck.Spec.RepeatAfterSec = int(schedule.Next(time.Now()).Sub(time.Now())/time.Second) + 1
 			log.Info("spec.RepeatAfterSec value is set", "RepeatAfterSec", healthCheck.Spec.RepeatAfterSec)
-		} else if int(time.Now().Unix()-finishedAtTime) < hcSpec.RepeatAfterSec {
-			log.Info("Workflow already executed", "finishedAtTime", finishedAtTime)
+		} else if int(time.Now().Unix()-finishedAtTime) < hcSpec.RepeatAfterSec && r.RepeatTimersByName[healthCheck.GetName()] != nil {
+			log.Info("Workflow already executed, and there is repeat schedule has been added to RepeatTimersByName map", "finishedAtTime", finishedAtTime)
 			return ctrl.Result{}, nil
 		}
 
@@ -421,18 +422,25 @@ func (r *HealthCheckReconciler) deleteRBACForWorkflow(ctx context.Context, log l
 // this function exists to assist with how a function called by the timer.AfterFunc() method operates to call a
 // function which takes parameters, it is easiest to build this closure which holds access to the parameters we need.
 // the helper returns a function object taking no parameters directly, this is what we want to give AfterFunc
-func (r *HealthCheckReconciler) createSubmitWorkflowHelper(ctx context.Context, log logr.Logger, wfNamespace string, hc *activemonitorv1alpha1.HealthCheck) func() {
+func (r *HealthCheckReconciler) createSubmitWorkflowHelper(ctx context.Context, log logr.Logger, wfNamespace string, prevHealthCheck *activemonitorv1alpha1.HealthCheck) func() {
 	return func() {
 		log.Info("Creating and Submitting Workflow...")
-		wfName, err := r.createSubmitWorkflow(ctx, log, hc)
+
+		healthCheckNew := &activemonitorv1alpha1.HealthCheck{}
+		if err := r.Get(ctx, client.ObjectKey{Name: prevHealthCheck.Name, Namespace: prevHealthCheck.Namespace}, healthCheckNew); err != nil {
+			log.Error(err, "Error getting healthcheck resource")
+			return
+		}
+
+		wfName, err := r.createSubmitWorkflow(ctx, log, healthCheckNew)
 		if err != nil {
 			log.Error(err, "Error creating or submitting workflow")
-			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error creating or submitting workflow")
+			r.Recorder.Event(healthCheckNew, v1.EventTypeWarning, "Warning", "Error creating or submitting workflow")
 		}
-		err = r.watchWorkflowReschedule(ctx, ctrl.Request{}, log, wfNamespace, wfName, hc)
+		err = r.watchWorkflowReschedule(ctx, ctrl.Request{}, log, wfNamespace, wfName, healthCheckNew)
 		if err != nil {
 			log.Error(err, "Error watching or rescheduling workflow")
-			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error watching or rescheduling workflow")
+			r.Recorder.Event(healthCheckNew, v1.EventTypeWarning, "Warning", "Error watching or rescheduling workflow")
 		}
 	}
 }
@@ -652,6 +660,8 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 				break
 			}
 		}
+
+		log.Info("waiting for workflow to complete", "namespace", wfNamespace, "name", wfName)
 	}
 
 	// since the workflow has taken an unknown duration of time to complete, it's possible that its parent
