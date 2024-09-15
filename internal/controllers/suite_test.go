@@ -106,14 +106,15 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (&HealthCheckReconciler{
+	sharedCtrl = &HealthCheckReconciler{
 		Client:     k8sManager.GetClient(),
 		DynClient:  dynamic.NewForConfigOrDie(k8sManager.GetConfig()),
 		Recorder:   k8sManager.GetEventRecorderFor("HealthCheck"),
 		kubeclient: kubernetes.NewForConfigOrDie(k8sManager.GetConfig()),
 		Log:        log,
 		TimerLock:  sync.RWMutex{},
-	}).SetupWithManager(k8sManager)
+	}
+	err = sharedCtrl.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	go func() {
