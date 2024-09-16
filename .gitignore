@@ -6,6 +6,7 @@
 *.so
 *.dylib
 testbin/*
+active-monitor-controller
 
 # Temporary or metadata files
 *.yaml-e
