@@ -426,21 +426,21 @@ func (r *HealthCheckReconciler) createSubmitWorkflowHelper(ctx context.Context, 
 	return func() {
 		log.Info("Creating and Submitting Workflow...")
 
-		healthCheckNew := &activemonitorv1alpha1.HealthCheck{}
-		if err := r.Get(ctx, client.ObjectKey{Name: prevHealthCheck.Name, Namespace: prevHealthCheck.Namespace}, healthCheckNew); err != nil {
+		healthCheckInstance := &activemonitorv1alpha1.HealthCheck{}
+		if err := r.Get(ctx, client.ObjectKey{Name: prevHealthCheck.Name, Namespace: prevHealthCheck.Namespace}, healthCheckInstance); err != nil {
 			log.Error(err, "Error getting healthcheck resource")
 			return
 		}
 
-		wfName, err := r.createSubmitWorkflow(ctx, log, healthCheckNew)
+		wfName, err := r.createSubmitWorkflow(ctx, log, healthCheckInstance)
 		if err != nil {
 			log.Error(err, "Error creating or submitting workflow")
-			r.Recorder.Event(healthCheckNew, v1.EventTypeWarning, "Warning", "Error creating or submitting workflow")
+			r.Recorder.Event(healthCheckInstance, v1.EventTypeWarning, "Warning", "Error creating or submitting workflow")
 		}
-		err = r.watchWorkflowReschedule(ctx, ctrl.Request{}, log, wfNamespace, wfName, healthCheckNew)
+		err = r.watchWorkflowReschedule(ctx, ctrl.Request{}, log, wfNamespace, wfName, healthCheckInstance)
 		if err != nil {
 			log.Error(err, "Error watching or rescheduling workflow")
-			r.Recorder.Event(healthCheckNew, v1.EventTypeWarning, "Warning", "Error watching or rescheduling workflow")
+			r.Recorder.Event(healthCheckInstance, v1.EventTypeWarning, "Warning", "Error watching or rescheduling workflow")
 		}
 	}
 }
