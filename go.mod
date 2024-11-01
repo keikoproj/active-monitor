@@ -3,7 +3,7 @@ module github.com/keikoproj/active-monitor
 go 1.21
 
 require (
-	github.com/argoproj/argo-workflows/v3 v3.5.8
+	github.com/argoproj/argo-workflows/v3 v3.5.12
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-logr/logr v1.4.2
 	github.com/keikoproj/inverse-exp-backoff v0.0.3
