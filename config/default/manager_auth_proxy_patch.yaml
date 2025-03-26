@@ -1,5 +1,4 @@
-# This patch inject a sidecar container which is a HTTP proxy for the controller manager,
-# it performs RBAC authorization against the Kubernetes API using SubjectAccessReviews.
+# This patch configures the manager to use the secure metrics endpoint with authentication and authorization
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -9,16 +8,11 @@ spec:
   template:
     spec:
       containers:
-      - name: kube-rbac-proxy
-        image: gcr.io/kubebuilder/kube-rbac-proxy:v0.13.0
+      - name: manager
         args:
-        - "--secure-listen-address=0.0.0.0:8443"
-        - "--upstream=http://127.0.0.1:8080/"
-        - "--logtostderr=true"
-        - "--v=10"
+        - "--metrics-bind-address=:8443"
+        - "--metrics-secure=true"
         ports:
         - containerPort: 8443
           name: https
-      - name: manager
-        args:
-        - "--metrics-addr=127.0.0.1:8080"
+          protocol: TCP
