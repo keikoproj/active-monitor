@@ -6,6 +6,7 @@ metadata:
 rules:
 - apiGroups:
   - activemonitor.keikoproj.io
+  - activemonitor.keikoproj.io.my.domain
   resources:
   - healthchecks
   verbs:
@@ -18,37 +19,18 @@ rules:
   - watch
 - apiGroups:
   - activemonitor.keikoproj.io
+  - activemonitor.keikoproj.io.my.domain
   resources:
   - healthchecks/status
   verbs:
   - get
   - patch
   - update
-- apiGroups:
-  - activemonitor.keikoproj.io.my.domain
-  resources:
-  - healthchecks
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
 - apiGroups:
   - activemonitor.keikoproj.io.my.domain
   resources:
   - healthchecks/finalizers
   verbs:
-  - update
-- apiGroups:
-  - activemonitor.keikoproj.io.my.domain
-  resources:
-  - healthchecks/status
-  verbs:
-  - get
-  - patch
   - update
 - apiGroups:
   - argoproj.io
