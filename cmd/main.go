@@ -30,8 +30,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
-	// metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	metricsfilters "sigs.k8s.io/controller-runtime/pkg/metrics/filters"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	activemonitorv1alpha1 "github.com/keikoproj/active-monitor/api/v1alpha1"
 	"github.com/keikoproj/active-monitor/internal/controllers"
@@ -55,8 +55,10 @@ func main() {
 	var enableLeaderElection bool
 	var probeAddr string
 	var maxParallel int
+	var secureMetrics bool
 
-	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
+	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8443", "The address the metric endpoint binds to.")
+	flag.BoolVar(&secureMetrics, "metrics-secure", true, "Enable authentication and authorization for the metrics endpoint.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
@@ -71,9 +73,19 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
+	// Configure metrics options
+	metricsServerOptions := server.Options{
+		BindAddress: metricsAddr,
+	}
+
+	// Enable authentication and authorization for metrics when secure metrics is enabled
+	if secureMetrics {
+		metricsServerOptions.FilterProvider = metricsfilters.WithAuthenticationAndAuthorization
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme: scheme,
-		// Metrics:                metricsserver.Options{BindAddress: metricsAddr},
+		Scheme:                 scheme,
+		Metrics:                metricsServerOptions,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "689451f8.keikoproj.io",
