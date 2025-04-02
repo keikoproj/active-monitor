@@ -2,8 +2,6 @@ module github.com/keikoproj/active-monitor
 
 go 1.24
 
-toolchain go1.24.1
-
 require (
 	github.com/argoproj/argo-workflows/v3 v3.6.5
 	github.com/ghodss/yaml v1.0.0
@@ -16,7 +14,7 @@ require (
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
-	golang.org/x/net v0.37.0
+	golang.org/x/net v0.38.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.32.3
 	k8s.io/apimachinery v0.32.3
