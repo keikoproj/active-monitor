@@ -1,10 +1,10 @@
 # Image URL to use all building/pushing image targets
 IMG ?= controller:latest
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.32.0
+ENVTEST_K8S_VERSION = 1.33.0
 
 # Tool Versions
-CONTROLLER_TOOLS_VERSION ?= v0.17.2
+CONTROLLER_TOOLS_VERSION ?= v0.18.0
 KUSTOMIZE_VERSION ?= v3.8.7
 
 LOCALBIN ?= $(shell pwd)/bin
@@ -161,7 +161,7 @@ $(KUSTOMIZE): $(LOCALBIN)
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
 $(ENVTEST): $(LOCALBIN)
-	test -s $(LOCALBIN)/setup-envtest || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+	test -s $(LOCALBIN)/setup-envtest || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.21
 
 $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
