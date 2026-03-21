@@ -127,11 +127,9 @@ func TestParseWorkflowFromHealthcheck_UnknownArtifact_ReturnsError(t *testing.T)
 	assert.Contains(t, err.Error(), "unknown artifact location")
 }
 
-func TestParseWorkflowFromHealthcheck_MissingSpec_Panics(t *testing.T) {
-	// Valid YAML but with no "spec" key. parseWorkflowFromHealthcheck panics at
-	// line 892 because data["spec"] is nil and is immediately type-asserted to
-	// map[string]interface{} without a nil guard. This test documents the panic
-	// so that when a nil guard is added the test can be changed to assert NoError.
+func TestParseWorkflowFromHealthcheck_MissingSpec_ReturnsError(t *testing.T) {
+	// Valid YAML but with no "spec" key — parseWorkflowFromHealthcheck should
+	// return an error rather than panic.
 	r := newTestReconciler()
 	hc := newHC("parse-missing-spec", "default")
 	noSpec := "apiVersion: argoproj.io/v1alpha1\nkind: Workflow\nmetadata:\n  generateName: test-\n"
@@ -142,9 +140,9 @@ func TestParseWorkflowFromHealthcheck_MissingSpec_Panics(t *testing.T) {
 	uwf := &unstructured.Unstructured{}
 	uwf.SetUnstructuredContent(map[string]interface{}{})
 
-	assert.Panics(t, func() {
-		_ = r.parseWorkflowFromHealthcheck(logr.Discard(), hc, uwf)
-	})
+	err := r.parseWorkflowFromHealthcheck(logr.Discard(), hc, uwf)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "missing spec")
 }
 
 // --- RBAC verb scope: health vs. remedy ClusterRole ---
