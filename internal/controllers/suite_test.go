@@ -117,7 +117,10 @@ var _ = BeforeSuite(func() {
 	err = sharedCtrl.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
+	wg = &sync.WaitGroup{}
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		defer GinkgoRecover()
 		err = k8sManager.Start(ctx)
 		Expect(err).ToNot(HaveOccurred(), "failed to run manager")
@@ -126,8 +129,8 @@ var _ = BeforeSuite(func() {
 
 var _ = AfterSuite(func() {
 	By("stopping manager")
-	ctx.Done()
 	cancel()
+	wg.Wait()
 
 	By("tearing down the test environment")
 	err := testEnv.Stop()
