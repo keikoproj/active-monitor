@@ -5,7 +5,7 @@ go 1.24
 require (
 	github.com/argoproj/argo-workflows/v3 v3.6.5
 	github.com/ghodss/yaml v1.0.0
-	github.com/go-logr/logr v1.4.2
+	github.com/go-logr/logr v1.4.3
 	github.com/keikoproj/inverse-exp-backoff v0.1.1
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onsi/ginkgo/v2 v2.23.4
