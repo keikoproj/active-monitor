@@ -51,7 +51,6 @@ import (
 
 const (
 	hcKind                    = "HealthCheck"
-	hcVersion                 = "v1alpha1"
 	wfGroup                   = "argoproj.io"
 	wfVersion                 = "v1alpha1"
 	wfKind                    = "Workflow"
@@ -70,7 +69,8 @@ const (
 )
 
 var (
-	wfGvk = schema.GroupVersionKind{
+	hcVersion = activemonitorv1alpha1.GroupVersion.String()
+	wfGvk     = schema.GroupVersionKind{
 		Group:   wfGroup,
 		Version: wfVersion,
 		Kind:    wfKind,
