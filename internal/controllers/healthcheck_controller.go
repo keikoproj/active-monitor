@@ -111,7 +111,8 @@ func NewHealthCheckReconciler(mgr manager.Manager, log logr.Logger, MaxParallel 
 		kubeclient:  kubernetes.NewForConfigOrDie(mgr.GetConfig()),
 		Log:         log,
 		MaxParallel: MaxParallel,
-		TimerLock:   sync.RWMutex{},
+		TimerLock:          sync.RWMutex{},
+		RepeatTimersByName: make(map[string]*time.Timer),
 	}
 }
 
@@ -123,11 +124,6 @@ func NewHealthCheckReconciler(mgr manager.Manager, log logr.Logger, MaxParallel 
 func (r *HealthCheckReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues(hcKind, req.NamespacedName)
 	log.Info("Starting HealthCheck reconcile for ...")
-
-	// initialize timers map if not already done
-	if r.RepeatTimersByName == nil {
-		r.RepeatTimersByName = make(map[string]*time.Timer)
-	}
 
 	healthCheck := &activemonitorv1alpha1.HealthCheck{}
 	if err := r.Get(ctx, req.NamespacedName, healthCheck); err != nil {
@@ -218,7 +214,7 @@ func (r *HealthCheckReconciler) processHealthCheck(ctx context.Context, log logr
 			// we need to update the spec so have to healthCheck.Spec.RepeatAfterSec instead of local variable hcSpec
 			healthCheck.Spec.RepeatAfterSec = int(schedule.Next(time.Now()).Sub(time.Now())/time.Second) + 1
 			log.Info("spec.RepeatAfterSec value is set", "RepeatAfterSec", healthCheck.Spec.RepeatAfterSec)
-		} else if int(time.Now().Unix()-finishedAtTime) < hcSpec.RepeatAfterSec && r.RepeatTimersByName[healthCheck.GetName()] != nil {
+		} else if int(time.Now().Unix()-finishedAtTime) < hcSpec.RepeatAfterSec && r.GetTimerByName(healthCheck.GetName()) != nil {
 			log.Info("Workflow already executed, and there is repeat schedule has been added to RepeatTimersByName map", "finishedAtTime", finishedAtTime)
 			return ctrl.Result{}, nil
 		}
