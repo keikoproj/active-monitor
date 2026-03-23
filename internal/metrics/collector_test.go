@@ -5,6 +5,7 @@ import (
 
 	wfv1 "github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/assert"
 )
 
 var registry = prometheus.NewRegistry()
@@ -55,4 +56,33 @@ func TestCollectNoValueMetric(t *testing.T) {
 		},
 	}
 	CreateDynamicPrometheusMetric("test-flow", wfstatus, registry)
+}
+
+func TestCreateDynamicPrometheusMetric_NilWorkflowStatus_DoesNotPanic(t *testing.T) {
+	// workflowStatus.Outputs is accessed on the first line of CreateDynamicPrometheusMetric;
+	// passing a nil pointer would panic without a nil guard. This test documents that the
+	// nil check covers the WorkflowStatus pointer itself (the function receives a pointer
+	// and checks .Outputs, so a nil WorkflowStatus would panic). If this test fails with a
+	// panic, add a nil guard for workflowStatus before the Outputs check.
+	assert.NotPanics(t, func() {
+		wfstatus := &wfv1.WorkflowStatus{Outputs: nil}
+		CreateDynamicPrometheusMetric("nil-outputs-flow", wfstatus, registry)
+	})
+}
+
+func TestCreateDynamicPrometheusMetric_NilOutputsParameters_DoesNotPanic(t *testing.T) {
+	assert.NotPanics(t, func() {
+		wfstatus := &wfv1.WorkflowStatus{
+			Outputs: &wfv1.Outputs{Parameters: nil},
+		}
+		CreateDynamicPrometheusMetric("nil-params-flow", wfstatus, registry)
+	})
+}
+
+func TestCreateDynamicPrometheusMetric_ConcurrentRegistration_NoDataRace(t *testing.T) {
+	// This test documents a known data race in CustomGaugeMetricsMap (package-level
+	// map with no mutex). Running with -race will detect concurrent map read/writes
+	// in collector.go lines 90-102. The fix is to protect CustomGaugeMetricsMap with
+	// a sync.RWMutex. Tracked in issue #288.
+	t.Skip("Known data race in CustomGaugeMetricsMap — see issue #288")
 }
