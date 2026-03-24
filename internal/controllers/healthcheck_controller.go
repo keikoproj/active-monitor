@@ -111,7 +111,8 @@ func NewHealthCheckReconciler(mgr manager.Manager, log logr.Logger, MaxParallel 
 		kubeclient:  kubernetes.NewForConfigOrDie(mgr.GetConfig()),
 		Log:         log,
 		MaxParallel: MaxParallel,
-		TimerLock:   sync.RWMutex{},
+		TimerLock:          sync.RWMutex{},
+		RepeatTimersByName: make(map[string]*time.Timer),
 	}
 }
 
@@ -123,11 +124,6 @@ func NewHealthCheckReconciler(mgr manager.Manager, log logr.Logger, MaxParallel 
 func (r *HealthCheckReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues(hcKind, req.NamespacedName)
 	log.Info("Starting HealthCheck reconcile for ...")
-
-	// initialize timers map if not already done
-	if r.RepeatTimersByName == nil {
-		r.RepeatTimersByName = make(map[string]*time.Timer)
-	}
 
 	healthCheck := &activemonitorv1alpha1.HealthCheck{}
 	if err := r.Get(ctx, req.NamespacedName, healthCheck); err != nil {
@@ -218,7 +214,7 @@ func (r *HealthCheckReconciler) processHealthCheck(ctx context.Context, log logr
 			// we need to update the spec so have to healthCheck.Spec.RepeatAfterSec instead of local variable hcSpec
 			healthCheck.Spec.RepeatAfterSec = int(schedule.Next(time.Now()).Sub(time.Now())/time.Second) + 1
 			log.Info("spec.RepeatAfterSec value is set", "RepeatAfterSec", healthCheck.Spec.RepeatAfterSec)
-		} else if int(time.Now().Unix()-finishedAtTime) < hcSpec.RepeatAfterSec && r.RepeatTimersByName[healthCheck.GetName()] != nil {
+		} else if int(time.Now().Unix()-finishedAtTime) < hcSpec.RepeatAfterSec && r.GetTimerByName(healthCheck.GetName()) != nil {
 			log.Info("Workflow already executed, and there is repeat schedule has been added to RepeatTimersByName map", "finishedAtTime", finishedAtTime)
 			return ctrl.Result{}, nil
 		}
@@ -889,8 +885,16 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 	pgc := PodGC{
 		Strategy: PodGCOnPodCompletion,
 	}
-	if podGC := data["spec"].(map[string]interface{})["podGC"]; podGC == nil {
-		data["spec"].(map[string]interface{})["podGC"] = &pgc
+	specRaw, ok := data["spec"]
+	if !ok || specRaw == nil {
+		err := errors.New("invalid workflow, missing spec")
+		log.Error(err, "Invalid workflow template spec")
+		r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Invalid workflow template spec")
+		return err
+	}
+	spec := specRaw.(map[string]interface{})
+	if spec["podGC"] == nil {
+		spec["podGC"] = &pgc
 	}
 	// make sure workflows by default get cleaned up
 	var timeout int64
@@ -902,19 +906,12 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 	}
 	// set service account, if specified
 	if hc.Spec.Workflow.Resource.ServiceAccount != "" {
-		data["spec"].(map[string]interface{})["serviceAccountName"] = hc.Spec.Workflow.Resource.ServiceAccount
+		spec["serviceAccountName"] = hc.Spec.Workflow.Resource.ServiceAccount
 		log.Info("Set ServiceAccount on Workflow", "ServiceAccount", hc.Spec.Workflow.Resource.ServiceAccount)
 	}
 	// and since we will reschedule workflows ourselves, we don't need k8s to try to do so for us
-	if activeDeadlineSeconds := data["spec"].(map[string]interface{})["activeDeadlineSeconds"]; activeDeadlineSeconds == nil {
-		data["spec"].(map[string]interface{})["activeDeadlineSeconds"] = &timeout
-	}
-	spec, ok := data["spec"]
-	if !ok {
-		err := errors.New("invalid workflow, missing spec")
-		log.Error(err, "Invalid workflow template spec")
-		r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Invalid workflow template spec")
-		return err
+	if spec["activeDeadlineSeconds"] == nil {
+		spec["activeDeadlineSeconds"] = &timeout
 	}
 	content["spec"] = spec
 	uwf.SetUnstructuredContent(content)
@@ -998,30 +995,30 @@ func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logg
 	pgc := PodGC{
 		Strategy: PodGCOnPodCompletion,
 	}
-	if podGC := data["spec"].(map[string]interface{})["podGC"]; podGC == nil {
-		data["spec"].(map[string]interface{})["podGC"] = &pgc
+	specRaw, ok := data["spec"]
+	if !ok || specRaw == nil {
+		err := errors.New("Invalid remedy workflow, missing spec")
+		log.Error(err, "Invalid remedy workflow template spec")
+		r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Invalid remedy workflow template spec")
+		return err
+	}
+	spec := specRaw.(map[string]interface{})
+	if spec["podGC"] == nil {
+		spec["podGC"] = &pgc
 	}
 	// set service account, if specified
 	if hc.Spec.RemedyWorkflow.Resource.ServiceAccount != "" {
-		data["spec"].(map[string]interface{})["serviceAccountName"] = hc.Spec.RemedyWorkflow.Resource.ServiceAccount
+		spec["serviceAccountName"] = hc.Spec.RemedyWorkflow.Resource.ServiceAccount
 		log.Info("Set ServiceAccount on Workflow", "ServiceAccount", hc.Spec.RemedyWorkflow.Resource.ServiceAccount)
 	}
 	// and since we will reschedule workflows ourselves, we don't need k8s to try to do so for us
 	var timeout int64
 	timeout = int64(hc.Spec.RepeatAfterSec)
-	if activeDeadlineSeconds := data["spec"].(map[string]interface{})["activeDeadlineSeconds"]; activeDeadlineSeconds == nil {
-		data["spec"].(map[string]interface{})["activeDeadlineSeconds"] = &timeout
+	if spec["activeDeadlineSeconds"] == nil {
+		spec["activeDeadlineSeconds"] = &timeout
 		hc.Spec.RemedyWorkflow.Timeout = int(timeout)
 	} else {
-		hc.Spec.RemedyWorkflow.Timeout = int(activeDeadlineSeconds.(float64))
-	}
-
-	spec, ok := data["spec"]
-	if !ok {
-		err := errors.New("Invalid remedy workflow, missing spec")
-		log.Error(err, "Invalid remedy workflow template spec")
-		r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Invalid remedy workflow template spec")
-		return err
+		hc.Spec.RemedyWorkflow.Timeout = int(spec["activeDeadlineSeconds"].(float64))
 	}
 	content["spec"] = spec
 	uwf.SetUnstructuredContent(content)
