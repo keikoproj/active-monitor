@@ -1204,7 +1204,7 @@ spec:
             - --configmap
             - workflow-controller-configmap
             - --executor-image
-            - argoproj/argoexec:v3.4.4
+            - argoproj/argoexec:v3.7.12
           command:
             - workflow-controller
           env:
@@ -1213,7 +1213,7 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: metadata.name
-          image: argoproj/workflow-controller:v3.4.4
+          image: argoproj/workflow-controller:v3.7.12
           livenessProbe:
             failureThreshold: 3
             httpGet:
