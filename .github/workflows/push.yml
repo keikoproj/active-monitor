@@ -19,8 +19,6 @@ jobs:
             runner: ubuntu-22.04
           - platform: linux/arm64
             runner: ubuntu-22.04-arm
-          - platform: linux/arm/v7
-            runner: ubuntu-22.04-arm
     steps:
       - name: Prepare
         run: |
@@ -35,12 +33,6 @@ jobs:
         with:
           install: true
           version: latest
-
-      - name: Set up QEMU
-        if: matrix.platform == 'linux/arm/v7'
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm
 
       - name: Login to DockerHub
         if: github.ref_type == 'tag'
