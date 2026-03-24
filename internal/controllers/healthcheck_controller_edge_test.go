@@ -142,10 +142,12 @@ var _ = Describe("Active-Monitor Controller edge cases", func() {
 			name := "edge-timer-delete"
 			// Pre-register a timer so the delete path exercises the Stop() call
 			stopped := false
+			sharedCtrl.TimerLock.Lock()
 			sharedCtrl.RepeatTimersByName[name] = time.AfterFunc(time.Hour, func() {
 				// This should never fire; the test verifies it gets stopped.
 				stopped = true
 			})
+			sharedCtrl.TimerLock.Unlock()
 
 			hc := &activemonitorv1alpha1.HealthCheck{
 				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: healthCheckNamespace},
@@ -184,7 +186,9 @@ var _ = Describe("Active-Monitor Controller edge cases", func() {
 		It("should not panic when deleted HealthCheck has no timer", func() {
 			name := "edge-timer-no-entry"
 			// Ensure no timer entry exists for this name
+			sharedCtrl.TimerLock.Lock()
 			delete(sharedCtrl.RepeatTimersByName, name)
+			sharedCtrl.TimerLock.Unlock()
 
 			hc := &activemonitorv1alpha1.HealthCheck{
 				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: healthCheckNamespace},
