@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"encoding/json"
+	"sync"
 	wfv1 "github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 	"github.com/mitchellh/mapstructure"
 	"github.com/prometheus/client_golang/prometheus"
@@ -46,7 +47,8 @@ var (
 		[]string{hcName, wf},
 	)
 
-	CustomGaugeMetricsMap = make(map[string]*prometheus.GaugeVec)
+	CustomGaugeMetricsMap     = make(map[string]*prometheus.GaugeVec)
+	customGaugeMetricsMapLock sync.RWMutex
 )
 
 // customMetricMap defines the custom metric structure
@@ -87,6 +89,7 @@ func CreateDynamicPrometheusMetric(name string, workflowStatus *wfv1.WorkflowSta
 			// replace "-" to "_" to make it Prometheus friendly metric names
 			metric.Name = strings.ReplaceAll(name, "-", "_") + "_" + metric.Name
 
+			customGaugeMetricsMapLock.Lock()
 			if _, ok := CustomGaugeMetricsMap[metric.Name]; !ok {
 				CustomGaugeMetricsMap[metric.Name] = prometheus.NewGaugeVec(
 					prometheus.GaugeOpts{
@@ -99,9 +102,14 @@ func CreateDynamicPrometheusMetric(name string, workflowStatus *wfv1.WorkflowSta
 					log.Errorf("Error registering %s metric %s\n", metric.Name, err)
 				}
 			}
+			customGaugeMetricsMapLock.Unlock()
+			customGaugeMetricsMapLock.RLock()
 			CustomGaugeMetricsMap[metric.Name].With(prometheus.Labels{hcName: name}).Set(metric.Value)
 			log.Printf("Successfully collected metric for %s, metric: %#v", name, metric)
+			customGaugeMetricsMapLock.RUnlock()
 		}
+		customGaugeMetricsMapLock.RLock()
 		log.Debugf("Here is the registered CustomGaugeMetricsMap %v\n", CustomGaugeMetricsMap)
+		customGaugeMetricsMapLock.RUnlock()
 	}
 }
