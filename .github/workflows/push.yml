@@ -4,31 +4,98 @@ on:
   push:
     branches: [ master ]
     tags:
-      - '*'
+      - 'v*'
 
 jobs:
-  push:
-    name: push
+  build:
+    name: Build ${{ matrix.platform }}
     if: github.repository_owner == 'keikoproj'
-    runs-on: ubuntu-22.04
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-22.04
+          - platform: linux/arm64
+            runner: ubuntu-22.04-arm
+          - platform: linux/arm/v7
+            runner: ubuntu-22.04-arm
     steps:
+      - name: Prepare
+        run: |
+          platform=${{ matrix.platform }}
+          echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
 
       - name: Check out code into the Go module directory
         uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
-        id: buildx
         uses: docker/setup-buildx-action@v3
         with:
           install: true
           version: latest
 
       - name: Set up QEMU
-        id: qemu
+        if: matrix.platform == 'linux/arm/v7'
         uses: docker/setup-qemu-action@v3
         with:
-          image: tonistiigi/binfmt:latest
-          platforms: all
+          platforms: arm
+
+      - name: Login to DockerHub
+        if: github.ref_type == 'tag'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push by digest
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: ${{ matrix.platform }}
+          push: ${{ github.ref_type == 'tag' }}
+          outputs: ${{ github.ref_type == 'tag' && 'type=image,name=keikoproj/active-monitor,push-by-digest=true,name-canonical=true,push=true' || '' }}
+
+      - name: Export digest
+        if: github.ref_type == 'tag'
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        if: github.ref_type == 'tag'
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ env.PLATFORM_PAIR }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    name: Merge and push manifest
+    if: github.repository_owner == 'keikoproj' && github.ref_type == 'tag'
+    runs-on: ubuntu-22.04
+    needs: build
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Docker meta
+        id: docker_meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ github.repository_owner }}/active-monitor
 
       - name: Login to DockerHub
         uses: docker/login-action@v3
@@ -36,18 +103,13 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      -
-        name: Docker meta
-        id: docker_meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ github.repository_owner }}/active-monitor
-      -
-        name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile
-          platforms: linux/amd64,linux/arm/v7,linux/arm64
-          push: true
-          tags: ${{ steps.docker_meta.outputs.tags }}
+      - name: Create manifest list and push
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ github.repository_owner }}/active-monitor@sha256:%s ' *)
+
+      - name: Inspect image
+        run: |
+          docker buildx imagetools inspect ${{ github.repository_owner }}/active-monitor:${{ steps.docker_meta.outputs.version }}
