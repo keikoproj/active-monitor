@@ -152,7 +152,9 @@ var _ = Describe("Active-Monitor Controller edge cases", func() {
 			hc := &activemonitorv1alpha1.HealthCheck{
 				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: healthCheckNamespace},
 				Spec: activemonitorv1alpha1.HealthCheckSpec{
-					RepeatAfterSec: 3600,
+					// RepeatAfterSec: 0 triggers a fast "Stopped" early return in processHealthCheck —
+					// these tests only exercise the deletion path, not workflow execution.
+					RepeatAfterSec: 0,
 					Level:          "cluster",
 					Workflow: activemonitorv1alpha1.Workflow{
 						GenerateName: "edge-timer-",
@@ -193,7 +195,9 @@ var _ = Describe("Active-Monitor Controller edge cases", func() {
 			hc := &activemonitorv1alpha1.HealthCheck{
 				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: healthCheckNamespace},
 				Spec: activemonitorv1alpha1.HealthCheckSpec{
-					RepeatAfterSec: 3600,
+					// RepeatAfterSec: 0 triggers a fast "Stopped" early return in processHealthCheck —
+					// these tests only exercise the deletion path, not workflow execution.
+					RepeatAfterSec: 0,
 					Level:          "cluster",
 					Workflow: activemonitorv1alpha1.Workflow{
 						GenerateName: "edge-notimer-",
