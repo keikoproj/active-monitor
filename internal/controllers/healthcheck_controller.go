@@ -105,12 +105,12 @@ func ignoreNotFound(err error) error {
 // NewHealthCheckReconciler returns an instance of HealthCheckReconciler
 func NewHealthCheckReconciler(mgr manager.Manager, log logr.Logger, MaxParallel int) *HealthCheckReconciler {
 	return &HealthCheckReconciler{
-		Client:      mgr.GetClient(),
-		DynClient:   dynamic.NewForConfigOrDie(mgr.GetConfig()),
-		Recorder:    mgr.GetEventRecorderFor("HealthCheck"),
-		kubeclient:  kubernetes.NewForConfigOrDie(mgr.GetConfig()),
-		Log:         log,
-		MaxParallel: MaxParallel,
+		Client:             mgr.GetClient(),
+		DynClient:          dynamic.NewForConfigOrDie(mgr.GetConfig()),
+		Recorder:           mgr.GetEventRecorderFor("HealthCheck"),
+		kubeclient:         kubernetes.NewForConfigOrDie(mgr.GetConfig()),
+		Log:                log,
+		MaxParallel:        MaxParallel,
 		TimerLock:          sync.RWMutex{},
 		RepeatTimersByName: make(map[string]*time.Timer),
 	}
