@@ -509,13 +509,9 @@ func (r *HealthCheckReconciler) createSubmitRemedyWorkflow(ctx context.Context, 
 	return generatedName, nil
 }
 
-func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req ctrl.Request, log logr.Logger, wfNamespace, wfName string, hc *activemonitorv1alpha1.HealthCheck) error {
-	var (
-		now              metav1.Time
-		maxTime, minTime time.Duration
-	)
-	then := metav1.Time{Time: time.Now()}
-	repeatAfterSec := hc.Spec.RepeatAfterSec
+// computeBackoffParams computes the inverse-exponential-backoff parameters
+// (maxTime, minTime, factor, timeout) from the HealthCheck spec.
+func (r *HealthCheckReconciler) computeBackoffParams(log logr.Logger, hc *activemonitorv1alpha1.HealthCheck) (maxTime, minTime time.Duration, factor float64, timeout time.Duration) {
 	if hc.Spec.BackoffMax == 0 {
 		maxTime = time.Duration(hc.Spec.Workflow.Timeout/2) * time.Second
 		if maxTime <= 0 {
@@ -530,10 +526,10 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 			minTime = time.Second
 		}
 	} else {
-		minTime = time.Duration(hc.Spec.BackoffMin)
+		minTime = time.Duration(hc.Spec.BackoffMin) * time.Second
 	}
 
-	factor := 0.5
+	factor = 0.5
 
 	if hc.Spec.BackoffFactor != "" {
 		val, err := strconv.ParseFloat(hc.Spec.BackoffFactor, 64)
@@ -543,7 +539,15 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 			factor = val
 		}
 	}
-	timeout := time.Duration(hc.Spec.Workflow.Timeout) * time.Second
+	timeout = time.Duration(hc.Spec.Workflow.Timeout) * time.Second
+	return
+}
+
+func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req ctrl.Request, log logr.Logger, wfNamespace, wfName string, hc *activemonitorv1alpha1.HealthCheck) error {
+	var now metav1.Time
+	then := metav1.Time{Time: time.Now()}
+	repeatAfterSec := hc.Spec.RepeatAfterSec
+	maxTime, minTime, factor, timeout := r.computeBackoffParams(log, hc)
 	log.Info("IEB with timeout times are", "maxTime:", maxTime, "minTime:", minTime, "timeout:", timeout)
 	for ieTimer, err1 := iebackoff.NewIEBWithTimeout(maxTime, minTime, timeout, factor, time.Now()); ; err1 = ieTimer.Next() {
 		now = metav1.Time{Time: time.Now()}
