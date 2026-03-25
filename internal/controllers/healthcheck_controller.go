@@ -105,12 +105,12 @@ func ignoreNotFound(err error) error {
 // NewHealthCheckReconciler returns an instance of HealthCheckReconciler
 func NewHealthCheckReconciler(mgr manager.Manager, log logr.Logger, MaxParallel int) *HealthCheckReconciler {
 	return &HealthCheckReconciler{
-		Client:      mgr.GetClient(),
-		DynClient:   dynamic.NewForConfigOrDie(mgr.GetConfig()),
-		Recorder:    mgr.GetEventRecorderFor("HealthCheck"),
-		kubeclient:  kubernetes.NewForConfigOrDie(mgr.GetConfig()),
-		Log:         log,
-		MaxParallel: MaxParallel,
+		Client:             mgr.GetClient(),
+		DynClient:          dynamic.NewForConfigOrDie(mgr.GetConfig()),
+		Recorder:           mgr.GetEventRecorderFor("HealthCheck"),
+		kubeclient:         kubernetes.NewForConfigOrDie(mgr.GetConfig()),
+		Log:                log,
+		MaxParallel:        MaxParallel,
 		TimerLock:          sync.RWMutex{},
 		RepeatTimersByName: make(map[string]*time.Timer),
 	}
@@ -262,6 +262,10 @@ func (r *HealthCheckReconciler) createRBACForWorkflow(ctx context.Context, log l
 	amnsRoleBinding := hcSa + "-ns-role-binding"
 	var remedySa, amclusterRemedyRole, amclusterRoleRemedyBinding, amnsRemedyRole, amnsRemedyRoleBinding, wfRemedyNamespace string
 	if !hc.Spec.RemedyWorkflow.IsEmpty() {
+		if hc.Spec.RemedyWorkflow.Resource == nil {
+			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "RemedyWorkflow is set but Resource is nil")
+			return errors.New("RemedyWorkflow is set but Resource is nil")
+		}
 		if hc.Spec.RemedyWorkflow.Resource.ServiceAccount != "" {
 			if hcSa == hc.Spec.RemedyWorkflow.Resource.ServiceAccount {
 				hc.Spec.RemedyWorkflow.Resource.ServiceAccount = hcSa + "-remedy"
@@ -361,6 +365,10 @@ func (r *HealthCheckReconciler) createRBACForWorkflow(ctx context.Context, log l
 }
 
 func (r *HealthCheckReconciler) deleteRBACForWorkflow(ctx context.Context, log logr.Logger, hc *activemonitorv1alpha1.HealthCheck) error {
+	if hc.Spec.RemedyWorkflow.Resource == nil {
+		log.Info("No remedy workflow resource to clean up")
+		return nil
+	}
 	level := hc.Spec.Level
 	remedySa := hc.Spec.RemedyWorkflow.Resource.ServiceAccount
 	wfRemedyNamespace := hc.Spec.RemedyWorkflow.Resource.Namespace
@@ -476,6 +484,9 @@ func (r *HealthCheckReconciler) createSubmitWorkflow(ctx context.Context, log lo
 }
 
 func (r *HealthCheckReconciler) createSubmitRemedyWorkflow(ctx context.Context, log logr.Logger, hc *activemonitorv1alpha1.HealthCheck) (wfName string, err error) {
+	if hc.Spec.RemedyWorkflow.Resource == nil {
+		return "", errors.New("RemedyWorkflow Resource is nil")
+	}
 	remedyWorkflow := &unstructured.Unstructured{}
 	r.parseRemedyWorkflowFromHealthcheck(log, hc, remedyWorkflow)
 	remedyWorkflow.SetGroupVersionKind(wfGvk)
@@ -1007,7 +1018,7 @@ func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logg
 		spec["podGC"] = &pgc
 	}
 	// set service account, if specified
-	if hc.Spec.RemedyWorkflow.Resource.ServiceAccount != "" {
+	if hc.Spec.RemedyWorkflow.Resource != nil && hc.Spec.RemedyWorkflow.Resource.ServiceAccount != "" {
 		spec["serviceAccountName"] = hc.Spec.RemedyWorkflow.Resource.ServiceAccount
 		log.Info("Set ServiceAccount on Workflow", "ServiceAccount", hc.Spec.RemedyWorkflow.Resource.ServiceAccount)
 	}
