@@ -208,6 +208,7 @@ func (r *HealthCheckReconciler) processHealthCheck(ctx context.Context, log logr
 			if err != nil {
 				log.Error(err, "fail to parse cron")
 				r.Recorder.Event(healthCheck, v1.EventTypeWarning, "Warning", "Fail to parse cron")
+				return ctrl.Result{}, err
 			}
 			// The value from schedule next and subtracting from current time is in fraction as we convert to int it will be 1 less than
 			// the intended reschedule so we need to add 1sec to get the actual value
