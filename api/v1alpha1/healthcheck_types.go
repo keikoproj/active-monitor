@@ -18,6 +18,7 @@ package v1alpha1
 import (
 	"reflect"
 
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -94,9 +95,10 @@ type HealthCheckList struct {
 
 // Workflow struct describes a Remedy workflow
 type RemedyWorkflow struct {
-	GenerateName string          `json:"generateName,omitempty"`
-	Resource     *ResourceObject `json:"resource,omitempty"`
-	Timeout      int             `json:"workflowtimeout,omitempty"`
+	GenerateName string              `json:"generateName,omitempty"`
+	Resource     *ResourceObject     `json:"resource,omitempty"`
+	Timeout      int                 `json:"workflowtimeout,omitempty"`
+	RBACRules    []rbacv1.PolicyRule `json:"rbacRules,omitempty"`
 }
 
 func (w RemedyWorkflow) IsEmpty() bool {
@@ -105,9 +107,10 @@ func (w RemedyWorkflow) IsEmpty() bool {
 
 // Workflow struct describes an Argo workflow
 type Workflow struct {
-	GenerateName string          `json:"generateName,omitempty"`
-	Resource     *ResourceObject `json:"resource,omitempty"`
-	Timeout      int             `json:"workflowtimeout,omitempty"`
+	GenerateName string              `json:"generateName,omitempty"`
+	Resource     *ResourceObject     `json:"resource,omitempty"`
+	Timeout      int                 `json:"workflowtimeout,omitempty"`
+	RBACRules    []rbacv1.PolicyRule `json:"rbacRules,omitempty"`
 }
 
 // ResourceObject is the resource object to create on kubernetes

@@ -10,43 +10,36 @@ metadata:
   name: activemonitor-controller-role
   namespace: health
 rules:
-- apiGroups:
-  - "*"
-  resources:
-  - pods
-  - deployments
-  - replicasets
-  - services
-  - configmaps
-  - secrets
-  - workflows
-  - workflowtasksets
-  - serviceaccounts
-  - roles
-  - rolebindings
-  verbs:
-  - "*"
+- apiGroups: [""]
+  resources: [pods, services, configmaps, secrets, serviceaccounts, events]
+  verbs: [get, list, watch, create, update, patch, delete]
+- apiGroups: ["apps"]
+  resources: [deployments, replicasets]
+  verbs: [get, list, watch, create, update, patch, delete]
+- apiGroups: ["argoproj.io"]
+  resources: [workflows, workflowtasksets]
+  verbs: [get, list, watch, create, update, patch, delete]
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: [roles, rolebindings]
+  verbs: [get, list, watch, create, update, patch, delete]
 ---
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: activemonitor-controller-clusterrole
 rules:
-- apiGroups:
-  - "*"
-  - activemonitor.keikoproj.io
-  resources:
-  - workflows
-  - monitors
-  - pods
-  - events
-  - healthchecks
-  - healthchecks/status
-  - serviceaccounts
-  - clusterroles
-  - clusterrolebindings
-  verbs:
-  - "*"
+- apiGroups: ["activemonitor.keikoproj.io"]
+  resources: [healthchecks, healthchecks/status]
+  verbs: [get, list, watch, create, update, patch, delete]
+- apiGroups: ["argoproj.io"]
+  resources: [workflows]
+  verbs: [get, list, watch, create, update, patch, delete]
+- apiGroups: [""]
+  resources: [pods, events, serviceaccounts]
+  verbs: [get, list, watch, create, update, patch, delete]
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: [clusterroles, clusterrolebindings]
+  verbs: [get, list, watch, create, update, patch, delete]
 ---
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
