@@ -105,7 +105,7 @@ var _ = Describe("Active-Monitor Controller edge cases", func() {
 	})
 
 	Describe("HealthCheck with invalid cron expression does not panic", func() {
-		It("should reconcile without crashing", func() {
+		It("should reconcile without crashing and not reach a successful status", func() {
 			name := "edge-invalid-cron"
 			hc := &activemonitorv1alpha1.HealthCheck{
 				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: healthCheckNamespace},
@@ -134,6 +134,18 @@ var _ = Describe("Active-Monitor Controller edge cases", func() {
 				fetched := &activemonitorv1alpha1.HealthCheck{}
 				return k8sClient.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: healthCheckNamespace}, fetched)
 			}, 10*time.Second, time.Second).Should(Succeed(), "HealthCheck should remain accessible after invalid cron parse")
+
+			// With the fix, the cron parse error is returned (not silently swallowed
+			// via panic recovery), so the HealthCheck should never reach a successful
+			// "Completed" status. It should remain empty or in an error state.
+			Consistently(func() string {
+				fetched := &activemonitorv1alpha1.HealthCheck{}
+				if err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: healthCheckNamespace}, fetched); err != nil {
+					return "get-error"
+				}
+				return fetched.Status.Status
+			}, 5*time.Second, time.Second).ShouldNot(Equal("Completed"),
+				"HealthCheck with invalid cron should never reach Completed status")
 		})
 	})
 
@@ -254,6 +266,130 @@ var _ = Describe("Active-Monitor Controller edge cases", func() {
 				fetched := &activemonitorv1alpha1.HealthCheck{}
 				return k8sClient.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: healthCheckNamespace}, fetched)
 			}, 5*time.Second, time.Second).Should(Succeed(), "HealthCheck should remain accessible (no panic)")
+		})
+	})
+})
+
+var _ = Describe("Type assertion safety edge cases", func() {
+
+	Describe("HealthCheck with non-map metadata in workflow spec does not panic", func() {
+		It("should reconcile without crashing when metadata is a string", func() {
+			name := "edge-nonmap-metadata"
+			nonMapMetaSpec := `apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata: this-is-a-string
+spec:
+  entrypoint: hello
+  templates:
+  - name: hello
+    container:
+      image: alpine:3.6
+      command: [echo]
+      args: ["hello"]
+`
+			hc := &activemonitorv1alpha1.HealthCheck{
+				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: healthCheckNamespace},
+				Spec: activemonitorv1alpha1.HealthCheckSpec{
+					RepeatAfterSec: 5,
+					Level:          "cluster",
+					Workflow: activemonitorv1alpha1.Workflow{
+						GenerateName: "edge-meta-",
+						Resource: &activemonitorv1alpha1.ResourceObject{
+							Namespace:      healthCheckNamespace,
+							ServiceAccount: "activemonitor-healthcheck-sa",
+							Source:         activemonitorv1alpha1.ArtifactLocation{Inline: strPtr(nonMapMetaSpec)},
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(context.TODO(), hc)).To(Succeed())
+			defer k8sClient.Delete(context.TODO(), hc)
+
+			// The controller should not panic. The HealthCheck object should remain
+			// accessible and the controller should process it without crashing.
+			Eventually(func() error {
+				fetched := &activemonitorv1alpha1.HealthCheck{}
+				return k8sClient.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: healthCheckNamespace}, fetched)
+			}, 10*time.Second, time.Second).Should(Succeed(), "HealthCheck should remain accessible with non-map metadata")
+		})
+	})
+
+	Describe("HealthCheck with non-map spec in workflow does not panic", func() {
+		It("should reconcile without crashing when spec is a string", func() {
+			name := "edge-nonmap-spec"
+			nonMapSpecYAML := `apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: edge-spec-
+spec: this-is-not-a-map
+`
+			hc := &activemonitorv1alpha1.HealthCheck{
+				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: healthCheckNamespace},
+				Spec: activemonitorv1alpha1.HealthCheckSpec{
+					RepeatAfterSec: 5,
+					Level:          "cluster",
+					Workflow: activemonitorv1alpha1.Workflow{
+						GenerateName: "edge-spec-",
+						Resource: &activemonitorv1alpha1.ResourceObject{
+							Namespace:      healthCheckNamespace,
+							ServiceAccount: "activemonitor-healthcheck-sa",
+							Source:         activemonitorv1alpha1.ArtifactLocation{Inline: strPtr(nonMapSpecYAML)},
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(context.TODO(), hc)).To(Succeed())
+			defer k8sClient.Delete(context.TODO(), hc)
+
+			// The controller should handle the error gracefully (returning an error
+			// from parseWorkflowFromHealthcheck) without panicking.
+			Eventually(func() error {
+				fetched := &activemonitorv1alpha1.HealthCheck{}
+				return k8sClient.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: healthCheckNamespace}, fetched)
+			}, 10*time.Second, time.Second).Should(Succeed(), "HealthCheck should remain accessible with non-map spec")
+		})
+	})
+
+	Describe("HealthCheck with non-map labels in workflow spec does not panic", func() {
+		It("should reconcile without crashing when labels is a string", func() {
+			name := "edge-nonmap-labels"
+			nonMapLabelsSpec := `apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: edge-labels-
+  labels: not-a-map
+spec:
+  entrypoint: hello
+  templates:
+  - name: hello
+    container:
+      image: alpine:3.6
+      command: [echo]
+      args: ["hello"]
+`
+			hc := &activemonitorv1alpha1.HealthCheck{
+				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: healthCheckNamespace},
+				Spec: activemonitorv1alpha1.HealthCheckSpec{
+					RepeatAfterSec: 5,
+					Level:          "cluster",
+					Workflow: activemonitorv1alpha1.Workflow{
+						GenerateName: "edge-labels-",
+						Resource: &activemonitorv1alpha1.ResourceObject{
+							Namespace:      healthCheckNamespace,
+							ServiceAccount: "activemonitor-healthcheck-sa",
+							Source:         activemonitorv1alpha1.ArtifactLocation{Inline: strPtr(nonMapLabelsSpec)},
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(context.TODO(), hc)).To(Succeed())
+			defer k8sClient.Delete(context.TODO(), hc)
+
+			// The controller should not panic when labels can't be asserted to map.
+			Eventually(func() error {
+				fetched := &activemonitorv1alpha1.HealthCheck{}
+				return k8sClient.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: healthCheckNamespace}, fetched)
+			}, 10*time.Second, time.Second).Should(Succeed(), "HealthCheck should remain accessible with non-map labels")
 		})
 	})
 })
