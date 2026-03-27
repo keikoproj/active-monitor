@@ -452,6 +452,68 @@ func TestCreateRBACForWorkflow_SACollision_RemedyGetsSuffix(t *testing.T) {
 		"remedy SA should be renamed to avoid collision with health SA")
 }
 
+// --- processHealthCheck: cron parsing ---
+
+func TestProcessHealthCheck_InvalidCron_ReturnsError(t *testing.T) {
+	r := newTestReconciler()
+	hc := newHC("invalid-cron", "default")
+	hc.Spec.RepeatAfterSec = 0
+	hc.Spec.Level = "cluster"
+	hc.Spec.Schedule = activemonitorv1alpha1.ScheduleSpec{Cron: "NOT_A_VALID_CRON"}
+	hc.Spec.Workflow = activemonitorv1alpha1.Workflow{
+		GenerateName: "cron-test-",
+		Resource: &activemonitorv1alpha1.ResourceObject{
+			Namespace:      "default",
+			ServiceAccount: "sa",
+			Source:         activemonitorv1alpha1.ArtifactLocation{Inline: strPtr(inlineWorkflowSpecUnit)},
+		},
+	}
+
+	_, err := r.processHealthCheck(context.Background(), logr.Discard(), hc)
+	require.Error(t, err, "processHealthCheck should return an error for an invalid cron expression")
+}
+
+func TestProcessHealthCheck_ValidCron_SetsRepeatAfterSec(t *testing.T) {
+	r := newTestReconciler()
+	hc := newHC("valid-cron", "default")
+	hc.Spec.RepeatAfterSec = 0
+	hc.Spec.Level = "cluster"
+	hc.Spec.Schedule = activemonitorv1alpha1.ScheduleSpec{Cron: "@every 5s"}
+	hc.Spec.Workflow = activemonitorv1alpha1.Workflow{
+		GenerateName: "cron-test-",
+		Resource: &activemonitorv1alpha1.ResourceObject{
+			Namespace:      "default",
+			ServiceAccount: "sa",
+			Source:         activemonitorv1alpha1.ArtifactLocation{Inline: strPtr(inlineWorkflowSpecUnit)},
+		},
+	}
+
+	// processHealthCheck will fail later (nil kubeclient for RBAC), but
+	// RepeatAfterSec should be set from the cron schedule before that.
+	func() {
+		defer func() { recover() }()
+		r.processHealthCheck(context.Background(), logr.Discard(), hc)
+	}()
+
+	assert.Greater(t, hc.Spec.RepeatAfterSec, 0,
+		"RepeatAfterSec should be set to a positive value from the cron schedule")
+}
+
+// inlineWorkflowSpecUnit is a minimal Argo Workflow spec for unit tests.
+const inlineWorkflowSpecUnit = `apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: unit-test-
+spec:
+  entrypoint: hello
+  templates:
+  - name: hello
+    container:
+      image: alpine:3.6
+      command: [echo]
+      args: ["hello"]
+`
+
 // --- computeBackoffParams ---
 
 func TestComputeBackoffParams_ExplicitValues(t *testing.T) {
