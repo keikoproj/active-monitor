@@ -173,8 +173,8 @@ var _ = Describe("Active-Monitor Controller", func() {
 			instance.SetName(healthCheckAlreadyScheduled)
 			instance.Spec.RepeatAfterSec = 60
 			sharedCtrl.TimerLock.Lock()
-		sharedCtrl.RepeatTimersByName[instance.Name] = time.AfterFunc(time.Second*60, func() {})
-		sharedCtrl.TimerLock.Unlock()
+			sharedCtrl.RepeatTimersByName[instance.Name] = time.AfterFunc(time.Second*60, func() {})
+			sharedCtrl.TimerLock.Unlock()
 
 			err := k8sClient.Create(context.TODO(), instance)
 			if apierrors.IsInvalid(err) {
