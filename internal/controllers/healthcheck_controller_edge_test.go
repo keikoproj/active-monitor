@@ -105,7 +105,7 @@ var _ = Describe("Active-Monitor Controller edge cases", func() {
 	})
 
 	Describe("HealthCheck with invalid cron expression does not panic", func() {
-		It("should reconcile without crashing", func() {
+		It("should reconcile without crashing and not reach a successful status", func() {
 			name := "edge-invalid-cron"
 			hc := &activemonitorv1alpha1.HealthCheck{
 				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: healthCheckNamespace},
@@ -134,6 +134,18 @@ var _ = Describe("Active-Monitor Controller edge cases", func() {
 				fetched := &activemonitorv1alpha1.HealthCheck{}
 				return k8sClient.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: healthCheckNamespace}, fetched)
 			}, 10*time.Second, time.Second).Should(Succeed(), "HealthCheck should remain accessible after invalid cron parse")
+
+			// With the fix, the cron parse error is returned (not silently swallowed
+			// via panic recovery), so the HealthCheck should never reach a successful
+			// "Completed" status. It should remain empty or in an error state.
+			Consistently(func() string {
+				fetched := &activemonitorv1alpha1.HealthCheck{}
+				if err := k8sClient.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: healthCheckNamespace}, fetched); err != nil {
+					return "get-error"
+				}
+				return fetched.Status.Status
+			}, 5*time.Second, time.Second).ShouldNot(Equal("Completed"),
+				"HealthCheck with invalid cron should never reach Completed status")
 		})
 	})
 
@@ -220,6 +232,40 @@ var _ = Describe("Active-Monitor Controller edge cases", func() {
 				}
 				return fmt.Errorf("object still exists")
 			}, timeout).Should(Succeed(), "deletion should complete without panic")
+		})
+	})
+
+	Describe("HealthCheck with non-empty RemedyWorkflow but nil Resource does not panic (#313)", func() {
+		It("should reconcile without crashing when RemedyWorkflow.Resource is nil", func() {
+			name := "edge-nil-remedy-resource"
+			hc := &activemonitorv1alpha1.HealthCheck{
+				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: healthCheckNamespace},
+				Spec: activemonitorv1alpha1.HealthCheckSpec{
+					RepeatAfterSec: 30,
+					Level:          "cluster",
+					Workflow: activemonitorv1alpha1.Workflow{
+						GenerateName: "edge-remedy-nil-",
+						Resource: &activemonitorv1alpha1.ResourceObject{
+							Namespace:      healthCheckNamespace,
+							ServiceAccount: "activemonitor-healthcheck-sa",
+							Source:         activemonitorv1alpha1.ArtifactLocation{Inline: strPtr(inlineWorkflowSpec)},
+						},
+					},
+					RemedyWorkflow: activemonitorv1alpha1.RemedyWorkflow{
+						GenerateName: "remedy-nil-resource-",
+						// Resource intentionally nil — this previously caused a panic
+					},
+				},
+			}
+			Expect(k8sClient.Create(context.TODO(), hc)).To(Succeed())
+			defer k8sClient.Delete(context.TODO(), hc)
+
+			// The controller should reconcile without crashing. The nil Resource guard
+			// in createRBACForWorkflow should return an error, not a panic.
+			Consistently(func() error {
+				fetched := &activemonitorv1alpha1.HealthCheck{}
+				return k8sClient.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: healthCheckNamespace}, fetched)
+			}, 5*time.Second, time.Second).Should(Succeed(), "HealthCheck should remain accessible (no panic)")
 		})
 	})
 })
