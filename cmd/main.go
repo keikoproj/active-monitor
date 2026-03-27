@@ -16,7 +16,9 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
+	"fmt"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -27,6 +29,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/dynamic"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -50,44 +53,38 @@ func init() {
 	//+kubebuilder:scaffold:scheme
 }
 
-func main() {
-	var metricsAddr string
-	var enableLeaderElection bool
-	var probeAddr string
-	var maxParallel int
-	var secureMetrics bool
+// managerOptions holds the configuration parsed from command-line flags.
+type managerOptions struct {
+	metricsAddr          string
+	probeAddr            string
+	enableLeaderElection bool
+	maxParallel          int
+	secureMetrics        bool
+}
 
-	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8443", "The address the metric endpoint binds to.")
-	flag.BoolVar(&secureMetrics, "metrics-secure", true, "Enable authentication and authorization for the metrics endpoint.")
-	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
-		"Enable leader election for controller manager. "+
-			"Enabling this will ensure there is only one active controller manager.")
-	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	flag.IntVar(&maxParallel, "max-workers", 10, "The number of maximum parallel reconciles")
-
-	opts := zap.Options{
-		Development: true,
+// run contains the core application logic, extracted from main() for testability.
+// It accepts a REST config and a context so that tests can supply their own.
+// If restConfig is nil, it falls back to ctrl.GetConfigOrDie().
+func run(ctx context.Context, restConfig *rest.Config, opts managerOptions) error {
+	if restConfig == nil {
+		restConfig = ctrl.GetConfigOrDie()
 	}
-	opts.BindFlags(flag.CommandLine)
-	flag.Parse()
-
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	// Configure metrics options
 	metricsServerOptions := server.Options{
-		BindAddress: metricsAddr,
+		BindAddress: opts.metricsAddr,
 	}
 
 	// Enable authentication and authorization for metrics when secure metrics is enabled
-	if secureMetrics {
+	if opts.secureMetrics {
 		metricsServerOptions.FilterProvider = metricsfilters.WithAuthenticationAndAuthorization
 	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
 		Scheme:                 scheme,
 		Metrics:                metricsServerOptions,
-		HealthProbeBindAddress: probeAddr,
-		LeaderElection:         enableLeaderElection,
+		HealthProbeBindAddress: opts.probeAddr,
+		LeaderElection:         opts.enableLeaderElection,
 		LeaderElectionID:       "689451f8.keikoproj.io",
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
@@ -102,13 +99,12 @@ func main() {
 		// LeaderElectionReleaseOnCancel: true,
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to start manager")
-		os.Exit(1)
+		return fmt.Errorf("unable to start manager: %w", err)
 	}
 
-	dynClient, err := dynamic.NewForConfig(ctrl.GetConfigOrDie())
+	dynClient, err := dynamic.NewForConfig(mgr.GetConfig())
 	if err != nil {
-		setupLog.Error(err, "unable to get dynamic client")
+		return fmt.Errorf("unable to get dynamic client: %w", err)
 	}
 
 	if err = (&controllers.HealthCheckReconciler{
@@ -116,25 +112,47 @@ func main() {
 		DynClient:   dynClient,
 		Recorder:    mgr.GetEventRecorderFor("HealthCheck"),
 		Log:         ctrl.Log.WithName("controllers").WithName("HealthCheck"),
-		MaxParallel: maxParallel,
+		MaxParallel: opts.maxParallel,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "HealthCheck")
-		os.Exit(1)
+		return fmt.Errorf("unable to create controller HealthCheck: %w", err)
 	}
 	// +kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up health check")
-		os.Exit(1)
+		return fmt.Errorf("unable to set up health check: %w", err)
 	}
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up ready check")
-		os.Exit(1)
+		return fmt.Errorf("unable to set up ready check: %w", err)
 	}
 
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running manager")
+	if err := mgr.Start(ctx); err != nil {
+		return fmt.Errorf("problem running manager: %w", err)
+	}
+	return nil
+}
+
+func main() {
+	var opts managerOptions
+
+	flag.StringVar(&opts.metricsAddr, "metrics-bind-address", ":8443", "The address the metric endpoint binds to.")
+	flag.BoolVar(&opts.secureMetrics, "metrics-secure", true, "Enable authentication and authorization for the metrics endpoint.")
+	flag.BoolVar(&opts.enableLeaderElection, "leader-elect", false,
+		"Enable leader election for controller manager. "+
+			"Enabling this will ensure there is only one active controller manager.")
+	flag.StringVar(&opts.probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	flag.IntVar(&opts.maxParallel, "max-workers", 10, "The number of maximum parallel reconciles")
+
+	zapOpts := zap.Options{
+		Development: true,
+	}
+	zapOpts.BindFlags(flag.CommandLine)
+	flag.Parse()
+
+	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&zapOpts)))
+
+	if err := run(ctrl.SetupSignalHandler(), nil, opts); err != nil {
+		setupLog.Error(err, "application failed")
 		os.Exit(1)
 	}
 }
