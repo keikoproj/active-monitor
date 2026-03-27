@@ -2,13 +2,13 @@ package metrics
 
 import (
 	"encoding/json"
-	"sync"
 	wfv1 "github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 	"github.com/mitchellh/mapstructure"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 	"strings"
+	"sync"
 )
 
 var hcName = "healthcheck_name"
