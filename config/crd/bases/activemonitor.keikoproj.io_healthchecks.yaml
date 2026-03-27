@@ -112,6 +112,10 @@ spec:
                               path:
                                 type: string
                               verifyCert:
+                                description: |-
+                                  VerifyCert controls TLS certificate verification when fetching the workflow.
+                                  When nil (omitted) or true, TLS certificates are verified (secure default).
+                                  Set to false to skip verification (insecure, use only for testing).
                                 type: boolean
                             type: object
                         type: object
@@ -166,6 +170,10 @@ spec:
                               path:
                                 type: string
                               verifyCert:
+                                description: |-
+                                  VerifyCert controls TLS certificate verification when fetching the workflow.
+                                  When nil (omitted) or true, TLS certificates are verified (secure default).
+                                  Set to false to skip verification (insecure, use only for testing).
                                 type: boolean
                             type: object
                         type: object

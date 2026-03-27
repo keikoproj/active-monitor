@@ -134,8 +134,11 @@ type FileArtifact struct {
 
 // URLArtifact contains information about an artifact at an http endpoint.
 type URLArtifact struct {
-	Path       string `json:"path,omitempty"`
-	VerifyCert bool   `json:"verifyCert,omitempty"`
+	Path string `json:"path,omitempty"`
+	// VerifyCert controls TLS certificate verification when fetching the workflow.
+	// When nil (omitted) or true, TLS certificates are verified (secure default).
+	// Set to false to skip verification (insecure, use only for testing).
+	VerifyCert *bool `json:"verifyCert,omitempty"`
 }
 
 // ScheduleSpec contains the cron expression

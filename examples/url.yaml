@@ -14,4 +14,4 @@ spec:
         # provide your workflow via URL
         url:
           path: https://raw.githubusercontent.com/argoproj/argo/master/examples/hello-world.yaml
-          verifyCert: false
+          verifyCert: true
