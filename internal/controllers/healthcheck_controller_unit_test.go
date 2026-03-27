@@ -19,6 +19,7 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/go-logr/logr"
 	activemonitorv1alpha1 "github.com/keikoproj/active-monitor/api/v1alpha1"
@@ -291,4 +292,82 @@ func TestCreateRBACForWorkflow_SACollision_RemedyGetsSuffix(t *testing.T) {
 
 	assert.Equal(t, "shared-sa-remedy", hc.Spec.RemedyWorkflow.Resource.ServiceAccount,
 		"remedy SA should be renamed to avoid collision with health SA")
+}
+
+// --- computeBackoffParams ---
+
+func TestComputeBackoffParams_ExplicitValues(t *testing.T) {
+	r := newTestReconciler()
+	hc := newHC("backoff-explicit", "default")
+	hc.Spec.BackoffMin = 5
+	hc.Spec.BackoffMax = 10
+	hc.Spec.Workflow.Timeout = 60
+
+	maxTime, minTime, factor, timeout := r.computeBackoffParams(logr.Discard(), hc)
+
+	assert.Equal(t, 10*time.Second, maxTime, "maxTime should be BackoffMax in seconds")
+	assert.Equal(t, 5*time.Second, minTime, "minTime should be BackoffMin in seconds")
+	assert.Equal(t, 0.5, factor, "factor should default to 0.5")
+	assert.Equal(t, 60*time.Second, timeout, "timeout should be Workflow.Timeout in seconds")
+}
+
+func TestComputeBackoffParams_DefaultsFromTimeout(t *testing.T) {
+	r := newTestReconciler()
+	hc := newHC("backoff-defaults", "default")
+	hc.Spec.Workflow.Timeout = 120
+
+	maxTime, minTime, factor, timeout := r.computeBackoffParams(logr.Discard(), hc)
+
+	assert.Equal(t, 60*time.Second, maxTime, "maxTime should be Timeout/2")
+	assert.Equal(t, 2*time.Second, minTime, "minTime should be Timeout/60")
+	assert.Equal(t, 0.5, factor)
+	assert.Equal(t, 120*time.Second, timeout)
+}
+
+func TestComputeBackoffParams_MinClampedToOneSecond(t *testing.T) {
+	r := newTestReconciler()
+	hc := newHC("backoff-clamp", "default")
+	hc.Spec.Workflow.Timeout = 30 // 30/60 = 0, should clamp to 1s
+
+	maxTime, minTime, _, _ := r.computeBackoffParams(logr.Discard(), hc)
+
+	assert.Equal(t, 15*time.Second, maxTime, "maxTime should be Timeout/2")
+	assert.Equal(t, time.Second, minTime, "minTime should be clamped to 1s")
+}
+
+func TestComputeBackoffParams_MaxClampedToOneSecond(t *testing.T) {
+	r := newTestReconciler()
+	hc := newHC("backoff-max-clamp", "default")
+	hc.Spec.Workflow.Timeout = 0 // 0/2 = 0, should clamp to 1s
+
+	maxTime, minTime, _, _ := r.computeBackoffParams(logr.Discard(), hc)
+
+	assert.Equal(t, time.Second, maxTime, "maxTime should be clamped to 1s")
+	assert.Equal(t, time.Second, minTime, "minTime should be clamped to 1s")
+}
+
+func TestComputeBackoffParams_CustomFactor(t *testing.T) {
+	r := newTestReconciler()
+	hc := newHC("backoff-factor", "default")
+	hc.Spec.BackoffMin = 5
+	hc.Spec.BackoffMax = 10
+	hc.Spec.Workflow.Timeout = 60
+	hc.Spec.BackoffFactor = "0.8"
+
+	_, _, factor, _ := r.computeBackoffParams(logr.Discard(), hc)
+
+	assert.Equal(t, 0.8, factor, "factor should be parsed from BackoffFactor")
+}
+
+func TestComputeBackoffParams_InvalidFactor_DefaultsToHalf(t *testing.T) {
+	r := newTestReconciler()
+	hc := newHC("backoff-bad-factor", "default")
+	hc.Spec.BackoffMin = 5
+	hc.Spec.BackoffMax = 10
+	hc.Spec.Workflow.Timeout = 60
+	hc.Spec.BackoffFactor = "notanumber"
+
+	_, _, factor, _ := r.computeBackoffParams(logr.Discard(), hc)
+
+	assert.Equal(t, 0.5, factor, "factor should default to 0.5 on parse error")
 }
