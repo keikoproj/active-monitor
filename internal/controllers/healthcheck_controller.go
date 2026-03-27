@@ -105,12 +105,12 @@ func ignoreNotFound(err error) error {
 // NewHealthCheckReconciler returns an instance of HealthCheckReconciler
 func NewHealthCheckReconciler(mgr manager.Manager, log logr.Logger, MaxParallel int) *HealthCheckReconciler {
 	return &HealthCheckReconciler{
-		Client:      mgr.GetClient(),
-		DynClient:   dynamic.NewForConfigOrDie(mgr.GetConfig()),
-		Recorder:    mgr.GetEventRecorderFor("HealthCheck"),
-		kubeclient:  kubernetes.NewForConfigOrDie(mgr.GetConfig()),
-		Log:         log,
-		MaxParallel: MaxParallel,
+		Client:             mgr.GetClient(),
+		DynClient:          dynamic.NewForConfigOrDie(mgr.GetConfig()),
+		Recorder:           mgr.GetEventRecorderFor("HealthCheck"),
+		kubeclient:         kubernetes.NewForConfigOrDie(mgr.GetConfig()),
+		Log:                log,
+		MaxParallel:        MaxParallel,
 		TimerLock:          sync.RWMutex{},
 		RepeatTimersByName: make(map[string]*time.Timer),
 	}
@@ -510,13 +510,9 @@ func (r *HealthCheckReconciler) createSubmitRemedyWorkflow(ctx context.Context, 
 	return generatedName, nil
 }
 
-func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req ctrl.Request, log logr.Logger, wfNamespace, wfName string, hc *activemonitorv1alpha1.HealthCheck) error {
-	var (
-		now              metav1.Time
-		maxTime, minTime time.Duration
-	)
-	then := metav1.Time{Time: time.Now()}
-	repeatAfterSec := hc.Spec.RepeatAfterSec
+// computeBackoffParams computes the inverse-exponential-backoff parameters
+// (maxTime, minTime, factor, timeout) from the HealthCheck spec.
+func (r *HealthCheckReconciler) computeBackoffParams(log logr.Logger, hc *activemonitorv1alpha1.HealthCheck) (maxTime, minTime time.Duration, factor float64, timeout time.Duration) {
 	if hc.Spec.BackoffMax == 0 {
 		maxTime = time.Duration(hc.Spec.Workflow.Timeout/2) * time.Second
 		if maxTime <= 0 {
@@ -531,10 +527,10 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 			minTime = time.Second
 		}
 	} else {
-		minTime = time.Duration(hc.Spec.BackoffMin)
+		minTime = time.Duration(hc.Spec.BackoffMin) * time.Second
 	}
 
-	factor := 0.5
+	factor = 0.5
 
 	if hc.Spec.BackoffFactor != "" {
 		val, err := strconv.ParseFloat(hc.Spec.BackoffFactor, 64)
@@ -544,7 +540,15 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 			factor = val
 		}
 	}
-	timeout := time.Duration(hc.Spec.Workflow.Timeout) * time.Second
+	timeout = time.Duration(hc.Spec.Workflow.Timeout) * time.Second
+	return
+}
+
+func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req ctrl.Request, log logr.Logger, wfNamespace, wfName string, hc *activemonitorv1alpha1.HealthCheck) error {
+	var now metav1.Time
+	then := metav1.Time{Time: time.Now()}
+	repeatAfterSec := hc.Spec.RepeatAfterSec
+	maxTime, minTime, factor, timeout := r.computeBackoffParams(log, hc)
 	log.Info("IEB with timeout times are", "maxTime:", maxTime, "minTime:", minTime, "timeout:", timeout)
 	for ieTimer, err1 := iebackoff.NewIEBWithTimeout(maxTime, minTime, timeout, factor, time.Now()); ; err1 = ieTimer.Next() {
 		now = metav1.Time{Time: time.Now()}
@@ -601,7 +605,8 @@ func (r *HealthCheckReconciler) watchWorkflowReschedule(ctx context.Context, req
 				hc.Status.StartedAt = &then
 				hc.Status.FinishedAt = &now
 				hc.Status.LastFailedAt = &now
-				hc.Status.ErrorMessage = status["message"].(string)
+				msg, _ := status["message"].(string)
+				hc.Status.ErrorMessage = msg
 				hc.Status.FailedCount++
 				hc.Status.TotalHealthCheckRuns = hc.Status.SuccessCount + hc.Status.FailedCount
 				hc.Status.LastFailedWorkflow = wfName
@@ -774,7 +779,8 @@ func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctr
 				hc.Status.RemedyStartedAt = &then
 				hc.Status.RemedyFinishedAt = &now
 				hc.Status.RemedyLastFailedAt = &now
-				hc.Status.RemedyErrorMessage = status["message"].(string)
+				msg, _ := status["message"].(string)
+				hc.Status.RemedyErrorMessage = msg
 				hc.Status.RemedyFailedCount++
 				hc.Status.RemedyTotalRuns = hc.Status.RemedySuccessCount + hc.Status.RemedyFailedCount
 				hc.Status.LastFailedWorkflow = wfName
@@ -833,10 +839,11 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 
 	// check if metadata is set then parse workflow labels
 	log.Info("workflow metadata is", "metadata:", data["metadata"])
-	if data["metadata"] != nil {
-		log.Info("metadata workflow labels are", "workflowlabels:", data["metadata"].(map[string]interface{})["labels"])
+	metadataMap, metadataOk := data["metadata"].(map[string]interface{})
+	if data["metadata"] != nil && metadataOk {
+		log.Info("metadata workflow labels are", "workflowlabels:", metadataMap["labels"])
 		// parse workflow labels
-		wflabels, tr := data["metadata"].(map[string]interface{})["labels"]
+		wflabels, tr := metadataMap["labels"]
 		if !tr {
 			log.Info("Workflow Labels are not set. ")
 		}
@@ -848,15 +855,21 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 		// assign instanceId labels to workflows
 		if wflabels == nil {
 			r.workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
-		} else {
-			for k, v := range wflabels.(map[string]interface{}) {
+		} else if labelsMap, ok := wflabels.(map[string]interface{}); ok {
+			for k, v := range labelsMap {
 				strValue := fmt.Sprintf("%v", v)
 				r.workflowLabels[k] = strValue
 			}
+		} else {
+			log.Info("Workflow labels are not a map, using default instanceId label")
+			r.workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
 		}
 		log.Info("Workflow Labels set are:", "wflabel:", r.workflowLabels)
 		r.TimerLock.Unlock()
 	} else {
+		if data["metadata"] != nil && !metadataOk {
+			log.Info("metadata is not a map, treating as unset")
+		}
 		log.Info("metadata for workflow is not set")
 		type metadata struct {
 			generateName string
@@ -893,7 +906,13 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 		r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Invalid workflow template spec")
 		return err
 	}
-	spec := specRaw.(map[string]interface{})
+	spec, specOk := specRaw.(map[string]interface{})
+	if !specOk {
+		err := errors.New("invalid workflow, spec is not a map")
+		log.Error(err, "Invalid workflow template spec type")
+		r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Invalid workflow template spec type")
+		return err
+	}
 	if spec["podGC"] == nil {
 		spec["podGC"] = &pgc
 	}
@@ -943,10 +962,11 @@ func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logg
 
 	// check if metadata is set then parse workflow labels
 	log.Info("workflow metadata is", "metadata:", data["metadata"])
-	if data["metadata"] != nil {
-		log.Info("metadata workflow labels are", "workflowlabels:", data["metadata"].(map[string]interface{})["labels"])
+	metadataMap, metadataOk := data["metadata"].(map[string]interface{})
+	if data["metadata"] != nil && metadataOk {
+		log.Info("metadata workflow labels are", "workflowlabels:", metadataMap["labels"])
 		// parse workflow labels
-		wflabels, tr := data["metadata"].(map[string]interface{})["labels"]
+		wflabels, tr := metadataMap["labels"]
 		if !tr {
 			log.Info("Workflow Labels are not set. ")
 		}
@@ -958,15 +978,21 @@ func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logg
 		// assign instanceId labels to workflows
 		if wflabels == nil {
 			r.workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
-		} else {
-			for k, v := range wflabels.(map[string]interface{}) {
+		} else if labelsMap, ok := wflabels.(map[string]interface{}); ok {
+			for k, v := range labelsMap {
 				strValue := fmt.Sprintf("%v", v)
 				r.workflowLabels[k] = strValue
 			}
+		} else {
+			log.Info("Workflow labels are not a map, using default instanceId label")
+			r.workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
 		}
 		log.Info("Workflow Labels set are:", "wflabel:", r.workflowLabels)
 		r.TimerLock.Unlock()
 	} else {
+		if data["metadata"] != nil && !metadataOk {
+			log.Info("metadata is not a map, treating as unset")
+		}
 		log.Info("metadata for workflow is not set")
 		type metadata struct {
 			generateName string
@@ -1003,7 +1029,13 @@ func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logg
 		r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Invalid remedy workflow template spec")
 		return err
 	}
-	spec := specRaw.(map[string]interface{})
+	spec, specOk := specRaw.(map[string]interface{})
+	if !specOk {
+		err := errors.New("invalid remedy workflow, spec is not a map")
+		log.Error(err, "Invalid remedy workflow template spec type")
+		r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Invalid remedy workflow template spec type")
+		return err
+	}
 	if spec["podGC"] == nil {
 		spec["podGC"] = &pgc
 	}
@@ -1019,7 +1051,12 @@ func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logg
 		spec["activeDeadlineSeconds"] = &timeout
 		hc.Spec.RemedyWorkflow.Timeout = int(timeout)
 	} else {
-		hc.Spec.RemedyWorkflow.Timeout = int(spec["activeDeadlineSeconds"].(float64))
+		if deadline, ok := spec["activeDeadlineSeconds"].(float64); ok {
+			hc.Spec.RemedyWorkflow.Timeout = int(deadline)
+		} else {
+			log.Info("activeDeadlineSeconds is not a float64, using default timeout", "value", spec["activeDeadlineSeconds"])
+			hc.Spec.RemedyWorkflow.Timeout = int(timeout)
+		}
 	}
 	content["spec"] = spec
 	uwf.SetUnstructuredContent(content)

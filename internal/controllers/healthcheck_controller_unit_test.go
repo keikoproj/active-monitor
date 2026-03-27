@@ -19,6 +19,7 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/go-logr/logr"
 	activemonitorv1alpha1 "github.com/keikoproj/active-monitor/api/v1alpha1"
@@ -143,6 +144,164 @@ func TestParseWorkflowFromHealthcheck_MissingSpec_ReturnsError(t *testing.T) {
 	err := r.parseWorkflowFromHealthcheck(logr.Discard(), hc, uwf)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "missing spec")
+}
+
+// --- Type assertion safety: parseWorkflowFromHealthcheck ---
+
+func TestParseWorkflowFromHealthcheck_NonMapSpec_ReturnsError(t *testing.T) {
+	// When the YAML spec field is not a map, parseWorkflowFromHealthcheck should
+	// return an error instead of panicking on the type assertion.
+	r := newTestReconciler()
+	r.RepeatTimersByName = make(map[string]*time.Timer)
+	hc := newHC("parse-nonmap-spec", "default")
+	nonMapSpec := "apiVersion: argoproj.io/v1alpha1\nkind: Workflow\nmetadata:\n  generateName: test-\nspec: not-a-map\n"
+	hc.Spec.Workflow.Resource = &activemonitorv1alpha1.ResourceObject{
+		Source: activemonitorv1alpha1.ArtifactLocation{Inline: &nonMapSpec},
+	}
+	hc.Spec.RepeatAfterSec = 30
+	uwf := &unstructured.Unstructured{}
+	uwf.SetUnstructuredContent(map[string]interface{}{})
+
+	err := r.parseWorkflowFromHealthcheck(logr.Discard(), hc, uwf)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec is not a map")
+}
+
+func TestParseWorkflowFromHealthcheck_NonMapMetadata_NoPanic(t *testing.T) {
+	// When the YAML metadata field is not a map (e.g. a string), the function
+	// should not panic and should treat it as if metadata were unset.
+	r := newTestReconciler()
+	r.RepeatTimersByName = make(map[string]*time.Timer)
+	r.workflowLabels = nil
+	hc := newHC("parse-nonmap-metadata", "default")
+	nonMapMeta := "apiVersion: argoproj.io/v1alpha1\nkind: Workflow\nmetadata: not-a-map\nspec:\n  entrypoint: hello\n  templates:\n  - name: hello\n    container:\n      image: alpine:3.6\n      command: [echo]\n      args: [\"hello\"]\n"
+	hc.Spec.Workflow.Resource = &activemonitorv1alpha1.ResourceObject{
+		Source: activemonitorv1alpha1.ArtifactLocation{Inline: &nonMapMeta},
+	}
+	hc.Spec.Workflow.GenerateName = "test-"
+	hc.Spec.RepeatAfterSec = 30
+	uwf := &unstructured.Unstructured{}
+	uwf.SetUnstructuredContent(map[string]interface{}{})
+
+	// Should not panic
+	err := r.parseWorkflowFromHealthcheck(logr.Discard(), hc, uwf)
+	assert.NoError(t, err)
+	// Should have set the default instanceId label
+	assert.Equal(t, WfInstanceId, r.workflowLabels[WfInstanceIdLabelKey])
+}
+
+func TestParseWorkflowFromHealthcheck_NonMapLabels_NoPanic(t *testing.T) {
+	// When metadata.labels is not a map (e.g. a string), the function
+	// should not panic and should use the default instanceId label.
+	r := newTestReconciler()
+	r.RepeatTimersByName = make(map[string]*time.Timer)
+	r.workflowLabels = nil
+	hc := newHC("parse-nonmap-labels", "default")
+	nonMapLabels := "apiVersion: argoproj.io/v1alpha1\nkind: Workflow\nmetadata:\n  generateName: test-\n  labels: not-a-map\nspec:\n  entrypoint: hello\n  templates:\n  - name: hello\n    container:\n      image: alpine:3.6\n      command: [echo]\n      args: [\"hello\"]\n"
+	hc.Spec.Workflow.Resource = &activemonitorv1alpha1.ResourceObject{
+		Source: activemonitorv1alpha1.ArtifactLocation{Inline: &nonMapLabels},
+	}
+	hc.Spec.RepeatAfterSec = 30
+	uwf := &unstructured.Unstructured{}
+	uwf.SetUnstructuredContent(map[string]interface{}{})
+
+	// Should not panic
+	err := r.parseWorkflowFromHealthcheck(logr.Discard(), hc, uwf)
+	assert.NoError(t, err)
+	// Should have set the default instanceId label
+	assert.Equal(t, WfInstanceId, r.workflowLabels[WfInstanceIdLabelKey])
+}
+
+// --- Type assertion safety: parseRemedyWorkflowFromHealthcheck ---
+
+func TestParseRemedyWorkflowFromHealthcheck_NonMapSpec_ReturnsError(t *testing.T) {
+	r := newTestReconciler()
+	r.RepeatTimersByName = make(map[string]*time.Timer)
+	hc := newHC("parse-remedy-nonmap-spec", "default")
+	nonMapSpec := "apiVersion: argoproj.io/v1alpha1\nkind: Workflow\nmetadata:\n  generateName: test-\nspec: not-a-map\n"
+	hc.Spec.RemedyWorkflow.Resource = &activemonitorv1alpha1.ResourceObject{
+		Source: activemonitorv1alpha1.ArtifactLocation{Inline: &nonMapSpec},
+	}
+	hc.Spec.RepeatAfterSec = 30
+	uwf := &unstructured.Unstructured{}
+	uwf.SetUnstructuredContent(map[string]interface{}{})
+
+	err := r.parseRemedyWorkflowFromHealthcheck(logr.Discard(), hc, uwf)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "spec is not a map")
+}
+
+func TestParseRemedyWorkflowFromHealthcheck_NonFloatDeadline_UsesDefault(t *testing.T) {
+	// When activeDeadlineSeconds is a string (not float64), it should not panic
+	// and should fall back to the default timeout.
+	r := newTestReconciler()
+	r.RepeatTimersByName = make(map[string]*time.Timer)
+	r.workflowLabels = nil
+	hc := newHC("parse-remedy-nonfloat-deadline", "default")
+	strDeadline := "apiVersion: argoproj.io/v1alpha1\nkind: Workflow\nmetadata:\n  generateName: test-\nspec:\n  entrypoint: hello\n  activeDeadlineSeconds: \"300\"\n  templates:\n  - name: hello\n    container:\n      image: alpine:3.6\n      command: [echo]\n      args: [\"hello\"]\n"
+	hc.Spec.RemedyWorkflow.Resource = &activemonitorv1alpha1.ResourceObject{
+		Namespace:      "default",
+		ServiceAccount: "test-sa",
+		Source:         activemonitorv1alpha1.ArtifactLocation{Inline: &strDeadline},
+	}
+	hc.Spec.RepeatAfterSec = 60
+	uwf := &unstructured.Unstructured{}
+	uwf.SetUnstructuredContent(map[string]interface{}{})
+
+	err := r.parseRemedyWorkflowFromHealthcheck(logr.Discard(), hc, uwf)
+	assert.NoError(t, err)
+	// Should fall back to RepeatAfterSec as the timeout
+	assert.Equal(t, 60, hc.Spec.RemedyWorkflow.Timeout)
+}
+
+// --- Type assertion safety: status message extraction ---
+
+func TestSafeStatusMessageExtraction(t *testing.T) {
+	// Test the comma-ok pattern used for status["message"].(string).
+	// This validates the approach used at lines 603 and 776.
+	tests := []struct {
+		name     string
+		status   map[string]interface{}
+		expected string
+	}{
+		{
+			name:     "normal string message",
+			status:   map[string]interface{}{"message": "workflow failed: OOM killed"},
+			expected: "workflow failed: OOM killed",
+		},
+		{
+			name:     "nil message value",
+			status:   map[string]interface{}{"message": nil},
+			expected: "",
+		},
+		{
+			name:     "missing message key",
+			status:   map[string]interface{}{"phase": "Failed"},
+			expected: "",
+		},
+		{
+			name:     "non-string message (int)",
+			status:   map[string]interface{}{"message": 42},
+			expected: "",
+		},
+		{
+			name:     "non-string message (map)",
+			status:   map[string]interface{}{"message": map[string]interface{}{"error": "details"}},
+			expected: "",
+		},
+		{
+			name:     "empty string message",
+			status:   map[string]interface{}{"message": ""},
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			msg, _ := tt.status["message"].(string)
+			assert.Equal(t, tt.expected, msg)
+		})
+	}
 }
 
 // --- RBAC verb scope: health vs. remedy ClusterRole ---
@@ -354,3 +513,81 @@ spec:
       command: [echo]
       args: ["hello"]
 `
+
+// --- computeBackoffParams ---
+
+func TestComputeBackoffParams_ExplicitValues(t *testing.T) {
+	r := newTestReconciler()
+	hc := newHC("backoff-explicit", "default")
+	hc.Spec.BackoffMin = 5
+	hc.Spec.BackoffMax = 10
+	hc.Spec.Workflow.Timeout = 60
+
+	maxTime, minTime, factor, timeout := r.computeBackoffParams(logr.Discard(), hc)
+
+	assert.Equal(t, 10*time.Second, maxTime, "maxTime should be BackoffMax in seconds")
+	assert.Equal(t, 5*time.Second, minTime, "minTime should be BackoffMin in seconds")
+	assert.Equal(t, 0.5, factor, "factor should default to 0.5")
+	assert.Equal(t, 60*time.Second, timeout, "timeout should be Workflow.Timeout in seconds")
+}
+
+func TestComputeBackoffParams_DefaultsFromTimeout(t *testing.T) {
+	r := newTestReconciler()
+	hc := newHC("backoff-defaults", "default")
+	hc.Spec.Workflow.Timeout = 120
+
+	maxTime, minTime, factor, timeout := r.computeBackoffParams(logr.Discard(), hc)
+
+	assert.Equal(t, 60*time.Second, maxTime, "maxTime should be Timeout/2")
+	assert.Equal(t, 2*time.Second, minTime, "minTime should be Timeout/60")
+	assert.Equal(t, 0.5, factor)
+	assert.Equal(t, 120*time.Second, timeout)
+}
+
+func TestComputeBackoffParams_MinClampedToOneSecond(t *testing.T) {
+	r := newTestReconciler()
+	hc := newHC("backoff-clamp", "default")
+	hc.Spec.Workflow.Timeout = 30 // 30/60 = 0, should clamp to 1s
+
+	maxTime, minTime, _, _ := r.computeBackoffParams(logr.Discard(), hc)
+
+	assert.Equal(t, 15*time.Second, maxTime, "maxTime should be Timeout/2")
+	assert.Equal(t, time.Second, minTime, "minTime should be clamped to 1s")
+}
+
+func TestComputeBackoffParams_MaxClampedToOneSecond(t *testing.T) {
+	r := newTestReconciler()
+	hc := newHC("backoff-max-clamp", "default")
+	hc.Spec.Workflow.Timeout = 0 // 0/2 = 0, should clamp to 1s
+
+	maxTime, minTime, _, _ := r.computeBackoffParams(logr.Discard(), hc)
+
+	assert.Equal(t, time.Second, maxTime, "maxTime should be clamped to 1s")
+	assert.Equal(t, time.Second, minTime, "minTime should be clamped to 1s")
+}
+
+func TestComputeBackoffParams_CustomFactor(t *testing.T) {
+	r := newTestReconciler()
+	hc := newHC("backoff-factor", "default")
+	hc.Spec.BackoffMin = 5
+	hc.Spec.BackoffMax = 10
+	hc.Spec.Workflow.Timeout = 60
+	hc.Spec.BackoffFactor = "0.8"
+
+	_, _, factor, _ := r.computeBackoffParams(logr.Discard(), hc)
+
+	assert.Equal(t, 0.8, factor, "factor should be parsed from BackoffFactor")
+}
+
+func TestComputeBackoffParams_InvalidFactor_DefaultsToHalf(t *testing.T) {
+	r := newTestReconciler()
+	hc := newHC("backoff-bad-factor", "default")
+	hc.Spec.BackoffMin = 5
+	hc.Spec.BackoffMax = 10
+	hc.Spec.Workflow.Timeout = 60
+	hc.Spec.BackoffFactor = "notanumber"
+
+	_, _, factor, _ := r.computeBackoffParams(logr.Discard(), hc)
+
+	assert.Equal(t, 0.5, factor, "factor should default to 0.5 on parse error")
+}
