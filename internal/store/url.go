@@ -26,7 +26,11 @@ func NewURLReader(urlArtifact *v1alpha1.URLArtifact) (ArtifactReader, error) {
 
 func (reader *URLReader) Read() ([]byte, error) {
 	logrus.Debugf("reading urlArtifact from %s", reader.urlArtifact.Path)
-	insecureSkipVerify := !reader.urlArtifact.VerifyCert
+	// Secure by default: only skip TLS verification when explicitly set to false
+	insecureSkipVerify := reader.urlArtifact.VerifyCert != nil && !*reader.urlArtifact.VerifyCert
+	if insecureSkipVerify {
+		logrus.Warnf("TLS certificate verification is disabled for %s", reader.urlArtifact.Path)
+	}
 	client := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecureSkipVerify},
