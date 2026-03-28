@@ -26,6 +26,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func boolPtr(b bool) *bool { return &b }
+
 // --- GetArtifactReader ---
 
 func TestGetArtifactReader_Inline(t *testing.T) {
@@ -45,7 +47,7 @@ func TestGetArtifactReader_URL(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	loc := &v1alpha1.ArtifactLocation{URL: &v1alpha1.URLArtifact{Path: srv.URL, VerifyCert: false}}
+	loc := &v1alpha1.ArtifactLocation{URL: &v1alpha1.URLArtifact{Path: srv.URL, VerifyCert: boolPtr(false)}}
 	r, err := GetArtifactReader(loc)
 	require.NoError(t, err)
 	require.NotNil(t, r)
@@ -102,7 +104,7 @@ func TestURLReader_SuccessfulRead(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	r, err := NewURLReader(&v1alpha1.URLArtifact{Path: srv.URL, VerifyCert: false})
+	r, err := NewURLReader(&v1alpha1.URLArtifact{Path: srv.URL, VerifyCert: boolPtr(false)})
 	require.NoError(t, err)
 	b, err := r.Read()
 	require.NoError(t, err)
@@ -115,7 +117,7 @@ func TestURLReader_Non200ReturnsError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	r, err := NewURLReader(&v1alpha1.URLArtifact{Path: srv.URL, VerifyCert: false})
+	r, err := NewURLReader(&v1alpha1.URLArtifact{Path: srv.URL, VerifyCert: boolPtr(false)})
 	require.NoError(t, err)
 	_, err = r.Read()
 	require.Error(t, err)
@@ -123,7 +125,7 @@ func TestURLReader_Non200ReturnsError(t *testing.T) {
 }
 
 func TestURLReader_NetworkErrorReturnsError(t *testing.T) {
-	r, err := NewURLReader(&v1alpha1.URLArtifact{Path: "http://127.0.0.1:1", VerifyCert: false})
+	r, err := NewURLReader(&v1alpha1.URLArtifact{Path: "http://127.0.0.1:1", VerifyCert: boolPtr(false)})
 	require.NoError(t, err)
 	_, err = r.Read()
 	assert.Error(t, err)
@@ -135,8 +137,8 @@ func TestURLReader_VerifyCert_False_AcceptsSelfSigned(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	// VerifyCert: false → InsecureSkipVerify: true → should accept self-signed cert
-	r, err := NewURLReader(&v1alpha1.URLArtifact{Path: srv.URL, VerifyCert: false})
+	// VerifyCert: boolPtr(false) → InsecureSkipVerify: true → should accept self-signed cert
+	r, err := NewURLReader(&v1alpha1.URLArtifact{Path: srv.URL, VerifyCert: boolPtr(false)})
 	require.NoError(t, err)
 	b, err := r.Read()
 	require.NoError(t, err)
@@ -149,12 +151,30 @@ func TestURLReader_VerifyCert_True_RejectsSelfSigned(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	// VerifyCert: true → InsecureSkipVerify: false → should reject self-signed cert
-	r, err := NewURLReader(&v1alpha1.URLArtifact{Path: srv.URL, VerifyCert: true})
+	// VerifyCert: boolPtr(true) → InsecureSkipVerify: false → should reject self-signed cert
+	r, err := NewURLReader(&v1alpha1.URLArtifact{Path: srv.URL, VerifyCert: boolPtr(true)})
 	require.NoError(t, err)
 	_, err = r.Read()
 	require.Error(t, err)
 	// The error should mention certificate verification failure
+	assert.True(t,
+		strings.Contains(err.Error(), "certificate") ||
+			strings.Contains(err.Error(), "x509") ||
+			strings.Contains(err.Error(), "tls"),
+		"expected TLS error, got: %v", err)
+}
+
+func TestURLReader_VerifyCert_Nil_DefaultsToVerify(t *testing.T) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok"))
+	}))
+	defer srv.Close()
+
+	// VerifyCert: nil (omitted) → should default to verifying → reject self-signed cert
+	r, err := NewURLReader(&v1alpha1.URLArtifact{Path: srv.URL})
+	require.NoError(t, err)
+	_, err = r.Read()
+	require.Error(t, err)
 	assert.True(t,
 		strings.Contains(err.Error(), "certificate") ||
 			strings.Contains(err.Error(), "x509") ||
