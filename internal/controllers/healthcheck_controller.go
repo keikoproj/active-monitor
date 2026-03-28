@@ -80,7 +80,53 @@ var (
 		Version:  wfVersion,
 		Resource: wfResource,
 	}
+
+	// defaultHealthCheckRules provides least-privilege read-only access for monitoring workflows.
+	defaultHealthCheckRules = []rbacv1.PolicyRule{
+		{
+			APIGroups: []string{""},
+			Resources: []string{"pods", "nodes", "events", "services", "configmaps", "namespaces", "endpoints"},
+			Verbs:     []string{"get", "list", "watch"},
+		},
+		{
+			APIGroups: []string{"apps"},
+			Resources: []string{"deployments", "replicasets", "statefulsets", "daemonsets"},
+			Verbs:     []string{"get", "list", "watch"},
+		},
+		{
+			APIGroups: []string{"argoproj.io"},
+			Resources: []string{"workflows"},
+			Verbs:     []string{"get", "list", "watch"},
+		},
+	}
+
+	// defaultRemedyRules provides scoped write access for remedy workflows.
+	defaultRemedyRules = []rbacv1.PolicyRule{
+		{
+			APIGroups: []string{""},
+			Resources: []string{"pods", "events", "services", "configmaps", "endpoints"},
+			Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
+		},
+		{
+			APIGroups: []string{"apps"},
+			Resources: []string{"deployments", "replicasets", "statefulsets"},
+			Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
+		},
+		{
+			APIGroups: []string{"argoproj.io"},
+			Resources: []string{"workflows"},
+			Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
+		},
+	}
 )
+
+// resolveRBACRules returns custom rules if provided, otherwise returns defaults.
+func resolveRBACRules(customRules []rbacv1.PolicyRule, defaults []rbacv1.PolicyRule) []rbacv1.PolicyRule {
+	if len(customRules) > 0 {
+		return customRules
+	}
+	return defaults
+}
 
 // HealthCheckReconciler reconciles a HealthCheck object
 type HealthCheckReconciler struct {
@@ -298,9 +344,12 @@ func (r *HealthCheckReconciler) createRBACForWorkflow(ctx context.Context, log l
 			return err
 		}
 	}
+	hcRules := resolveRBACRules(hc.Spec.Workflow.RBACRules, defaultHealthCheckRules)
+	remedyRules := resolveRBACRules(hc.Spec.RemedyWorkflow.RBACRules, defaultRemedyRules)
+
 	if level == healthCheckClusterLevel {
 		if workFlowType != remedy {
-			_, err := r.createClusterRole(ctx, r.kubeclient, log, hc, amclusterRole)
+			_, err := r.createClusterRole(ctx, r.kubeclient, log, hc, amclusterRole, hcRules)
 			if err != nil {
 				log.Error(err, "Error creating ClusterRole for the healthcheck workflow")
 				r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error creating ClusterRole for the healthcheck workflow")
@@ -314,7 +363,7 @@ func (r *HealthCheckReconciler) createRBACForWorkflow(ctx context.Context, log l
 				return err
 			}
 		} else {
-			_, err := r.createRemedyClusterRole(ctx, r.kubeclient, log, hc, amclusterRemedyRole)
+			_, err := r.createRemedyClusterRole(ctx, r.kubeclient, log, hc, amclusterRemedyRole, remedyRules)
 			if err != nil {
 				log.Error(err, "Error creating ClusterRole for the remedy workflow")
 				r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error creating ClusterRole for the remedy workflow")
@@ -330,7 +379,7 @@ func (r *HealthCheckReconciler) createRBACForWorkflow(ctx context.Context, log l
 		}
 	} else if level == healthCheckNamespaceLevel {
 		if workFlowType != remedy {
-			_, err := r.createNameSpaceRole(ctx, r.kubeclient, log, hc, amnsRole, wfNamespace)
+			_, err := r.createNameSpaceRole(ctx, r.kubeclient, log, hc, amnsRole, wfNamespace, hcRules)
 			if err != nil {
 				log.Error(err, "Error creating NamespaceRole for the workflow")
 				r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error creating NamespaceRole for the workflow")
@@ -344,7 +393,7 @@ func (r *HealthCheckReconciler) createRBACForWorkflow(ctx context.Context, log l
 				return err
 			}
 		} else {
-			_, err := r.createRemedyNameSpaceRole(ctx, r.kubeclient, log, hc, amnsRemedyRole, wfRemedyNamespace)
+			_, err := r.createRemedyNameSpaceRole(ctx, r.kubeclient, log, hc, amnsRemedyRole, wfRemedyNamespace, remedyRules)
 			if err != nil {
 				log.Error(err, "Error creating NamespaceRole for the workflow")
 				r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Error creating NamespaceRole for the workflow")
@@ -1130,7 +1179,7 @@ func (r *HealthCheckReconciler) DeleteServiceAccount(ctx context.Context, client
 }
 
 // create a ClusterRole
-func (r *HealthCheckReconciler) createClusterRole(ctx context.Context, clientset kubernetes.Interface, log logr.Logger, hc *activemonitorv1alpha1.HealthCheck, clusterrole string) (string, error) {
+func (r *HealthCheckReconciler) createClusterRole(ctx context.Context, clientset kubernetes.Interface, log logr.Logger, hc *activemonitorv1alpha1.HealthCheck, clusterrole string, rules []rbacv1.PolicyRule) (string, error) {
 	clusrole, err := clientset.RbacV1().ClusterRoles().Get(ctx, clusterrole, metav1.GetOptions{})
 	// If a Cluster Role already exists just re-use it
 	if err == nil {
@@ -1145,13 +1194,7 @@ func (r *HealthCheckReconciler) createClusterRole(ctx context.Context, clientset
 				WfManagedByLabelKey: WfManagedByValue,
 			},
 		},
-		Rules: []rbacv1.PolicyRule{
-			{
-				APIGroups: []string{"*"},
-				Resources: []string{"*"},
-				Verbs:     []string{"get", "list", "watch"},
-			},
-		},
+		Rules: rules,
 	}, metav1.CreateOptions{})
 	if err != nil {
 		return "", err
@@ -1162,7 +1205,7 @@ func (r *HealthCheckReconciler) createClusterRole(ctx context.Context, clientset
 }
 
 // create a ClusterRole
-func (r *HealthCheckReconciler) createRemedyClusterRole(ctx context.Context, clientset kubernetes.Interface, log logr.Logger, hc *activemonitorv1alpha1.HealthCheck, clusterrole string) (string, error) {
+func (r *HealthCheckReconciler) createRemedyClusterRole(ctx context.Context, clientset kubernetes.Interface, log logr.Logger, hc *activemonitorv1alpha1.HealthCheck, clusterrole string, rules []rbacv1.PolicyRule) (string, error) {
 	clusrole, err := clientset.RbacV1().ClusterRoles().Get(ctx, clusterrole, metav1.GetOptions{})
 	// If a Cluster Role already exists just re-use it
 	if err == nil {
@@ -1177,13 +1220,7 @@ func (r *HealthCheckReconciler) createRemedyClusterRole(ctx context.Context, cli
 				WfManagedByLabelKey: WfManagedByValue,
 			},
 		},
-		Rules: []rbacv1.PolicyRule{
-			{
-				APIGroups: []string{"*"},
-				Resources: []string{"*"},
-				Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
-			},
-		},
+		Rules: rules,
 	}, metav1.CreateOptions{})
 	if err != nil {
 		return "", err
@@ -1215,7 +1252,7 @@ func (r *HealthCheckReconciler) DeleteClusterRole(ctx context.Context, clientset
 }
 
 // Create NamespaceRole
-func (r *HealthCheckReconciler) createNameSpaceRole(ctx context.Context, clientset kubernetes.Interface, log logr.Logger, hc *activemonitorv1alpha1.HealthCheck, nsrole string, namespace string) (string, error) {
+func (r *HealthCheckReconciler) createNameSpaceRole(ctx context.Context, clientset kubernetes.Interface, log logr.Logger, hc *activemonitorv1alpha1.HealthCheck, nsrole string, namespace string, rules []rbacv1.PolicyRule) (string, error) {
 	nsrole1, err := clientset.RbacV1().Roles(namespace).Get(ctx, nsrole, metav1.GetOptions{})
 	// If a Namespace Role already exists just re-use it
 	if err == nil {
@@ -1231,13 +1268,7 @@ func (r *HealthCheckReconciler) createNameSpaceRole(ctx context.Context, clients
 				WfManagedByLabelKey: WfManagedByValue,
 			},
 		},
-		Rules: []rbacv1.PolicyRule{
-			{
-				APIGroups: []string{"*"},
-				Resources: []string{"*"},
-				Verbs:     []string{"get", "list", "watch"},
-			},
-		},
+		Rules: rules,
 	}, metav1.CreateOptions{})
 	if err != nil {
 		return "", err
@@ -1248,7 +1279,7 @@ func (r *HealthCheckReconciler) createNameSpaceRole(ctx context.Context, clients
 }
 
 // Create NamespaceRole
-func (r *HealthCheckReconciler) createRemedyNameSpaceRole(ctx context.Context, clientset kubernetes.Interface, log logr.Logger, hc *activemonitorv1alpha1.HealthCheck, nsrole string, namespace string) (string, error) {
+func (r *HealthCheckReconciler) createRemedyNameSpaceRole(ctx context.Context, clientset kubernetes.Interface, log logr.Logger, hc *activemonitorv1alpha1.HealthCheck, nsrole string, namespace string, rules []rbacv1.PolicyRule) (string, error) {
 	nsrole1, err := clientset.RbacV1().Roles(namespace).Get(ctx, nsrole, metav1.GetOptions{})
 	// If a Namespace Role already exists just re-use it
 	if err == nil {
@@ -1264,13 +1295,7 @@ func (r *HealthCheckReconciler) createRemedyNameSpaceRole(ctx context.Context, c
 				WfManagedByLabelKey: WfManagedByValue,
 			},
 		},
-		Rules: []rbacv1.PolicyRule{
-			{
-				APIGroups: []string{"*"},
-				Resources: []string{"*"},
-				Verbs:     []string{"get", "list", "watch", "create", "update", "patch", "delete"},
-			},
-		},
+		Rules: rules,
 	}, metav1.CreateOptions{})
 	if err != nil {
 		return "", err
