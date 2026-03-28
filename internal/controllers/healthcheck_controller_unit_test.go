@@ -312,21 +312,20 @@ func TestCreateClusterRole_HealthCheck_ReadOnlyVerbs(t *testing.T) {
 	cs := fake.NewSimpleClientset()
 	hc := newHC("rbac-health", "default")
 
-	name, err := r.createClusterRole(context.Background(), cs, logr.Discard(), hc, "test-health-cluster-role")
+	name, err := r.createClusterRole(context.Background(), cs, logr.Discard(), hc, "test-health-cluster-role", defaultHealthCheckRules)
 	require.NoError(t, err)
 	assert.Equal(t, "test-health-cluster-role", name)
 
 	cr, err := cs.RbacV1().ClusterRoles().Get(context.Background(), "test-health-cluster-role", metav1.GetOptions{})
 	require.NoError(t, err)
-	require.Len(t, cr.Rules, 1)
-	verbs := cr.Rules[0].Verbs
-	assert.Contains(t, verbs, "get")
-	assert.Contains(t, verbs, "list")
-	assert.Contains(t, verbs, "watch")
-	assert.NotContains(t, verbs, "create")
-	assert.NotContains(t, verbs, "update")
-	assert.NotContains(t, verbs, "patch")
-	assert.NotContains(t, verbs, "delete")
+	require.Len(t, cr.Rules, 3)
+	for _, rule := range cr.Rules {
+		assert.NotContains(t, rule.APIGroups, "*", "apiGroups should not contain wildcards")
+		assert.NotContains(t, rule.Resources, "*", "resources should not contain wildcards")
+		for _, verb := range rule.Verbs {
+			assert.Contains(t, []string{"get", "list", "watch"}, verb, "health check rules should be read-only")
+		}
+	}
 }
 
 func TestCreateRemedyClusterRole_HasWriteVerbs(t *testing.T) {
@@ -334,21 +333,20 @@ func TestCreateRemedyClusterRole_HasWriteVerbs(t *testing.T) {
 	cs := fake.NewSimpleClientset()
 	hc := newHC("rbac-remedy", "default")
 
-	name, err := r.createRemedyClusterRole(context.Background(), cs, logr.Discard(), hc, "test-remedy-cluster-role")
+	name, err := r.createRemedyClusterRole(context.Background(), cs, logr.Discard(), hc, "test-remedy-cluster-role", defaultRemedyRules)
 	require.NoError(t, err)
 	assert.Equal(t, "test-remedy-cluster-role", name)
 
 	cr, err := cs.RbacV1().ClusterRoles().Get(context.Background(), "test-remedy-cluster-role", metav1.GetOptions{})
 	require.NoError(t, err)
-	require.Len(t, cr.Rules, 1)
-	verbs := cr.Rules[0].Verbs
-	assert.Contains(t, verbs, "get")
-	assert.Contains(t, verbs, "list")
-	assert.Contains(t, verbs, "watch")
-	assert.Contains(t, verbs, "create")
-	assert.Contains(t, verbs, "update")
-	assert.Contains(t, verbs, "patch")
-	assert.Contains(t, verbs, "delete")
+	require.Len(t, cr.Rules, 3)
+	for _, rule := range cr.Rules {
+		assert.NotContains(t, rule.APIGroups, "*", "apiGroups should not contain wildcards")
+		assert.NotContains(t, rule.Resources, "*", "resources should not contain wildcards")
+		assert.Contains(t, rule.Verbs, "get")
+		assert.Contains(t, rule.Verbs, "create")
+		assert.Contains(t, rule.Verbs, "delete")
+	}
 }
 
 func TestCreateClusterRole_Idempotent(t *testing.T) {
@@ -356,9 +354,9 @@ func TestCreateClusterRole_Idempotent(t *testing.T) {
 	cs := fake.NewSimpleClientset()
 	hc := newHC("rbac-idem", "default")
 
-	name1, err := r.createClusterRole(context.Background(), cs, logr.Discard(), hc, "idem-role")
+	name1, err := r.createClusterRole(context.Background(), cs, logr.Discard(), hc, "idem-role", defaultHealthCheckRules)
 	require.NoError(t, err)
-	name2, err := r.createClusterRole(context.Background(), cs, logr.Discard(), hc, "idem-role")
+	name2, err := r.createClusterRole(context.Background(), cs, logr.Discard(), hc, "idem-role", defaultHealthCheckRules)
 	require.NoError(t, err)
 	assert.Equal(t, name1, name2)
 }
@@ -371,7 +369,7 @@ func TestDeleteClusterRole_ManagedRole_IsDeleted(t *testing.T) {
 	hc := newHC("del-managed", "default")
 
 	// Create via controller so it gets the managed-by label
-	_, err := r.createClusterRole(context.Background(), cs, logr.Discard(), hc, "managed-role")
+	_, err := r.createClusterRole(context.Background(), cs, logr.Discard(), hc, "managed-role", defaultHealthCheckRules)
 	require.NoError(t, err)
 
 	err = r.DeleteClusterRole(context.Background(), cs, logr.Discard(), hc, "managed-role")
@@ -406,6 +404,56 @@ func createUnmanagedClusterRole(cs kubernetes.Interface, name string) error {
 		},
 	}, metav1.CreateOptions{})
 	return err
+}
+
+// --- resolveRBACRules ---
+
+func TestResolveRBACRules_CustomOverridesDefault(t *testing.T) {
+	custom := []rbacv1.PolicyRule{
+		{APIGroups: []string{"custom.io"}, Resources: []string{"widgets"}, Verbs: []string{"get"}},
+	}
+	result := resolveRBACRules(custom, defaultHealthCheckRules)
+	require.Len(t, result, 1)
+	assert.Equal(t, "custom.io", result[0].APIGroups[0])
+}
+
+func TestResolveRBACRules_EmptyUsesDefault(t *testing.T) {
+	result := resolveRBACRules(nil, defaultHealthCheckRules)
+	assert.Equal(t, defaultHealthCheckRules, result)
+
+	result = resolveRBACRules([]rbacv1.PolicyRule{}, defaultHealthCheckRules)
+	assert.Equal(t, defaultHealthCheckRules, result)
+}
+
+func TestCreateClusterRole_WithCustomRules(t *testing.T) {
+	r := newTestReconciler()
+	cs := fake.NewSimpleClientset()
+	hc := newHC("rbac-custom", "default")
+
+	customRules := []rbacv1.PolicyRule{
+		{APIGroups: []string{"custom.io"}, Resources: []string{"widgets"}, Verbs: []string{"get", "list"}},
+	}
+	name, err := r.createClusterRole(context.Background(), cs, logr.Discard(), hc, "custom-role", customRules)
+	require.NoError(t, err)
+	assert.Equal(t, "custom-role", name)
+
+	cr, err := cs.RbacV1().ClusterRoles().Get(context.Background(), "custom-role", metav1.GetOptions{})
+	require.NoError(t, err)
+	require.Len(t, cr.Rules, 1)
+	assert.Equal(t, []string{"custom.io"}, cr.Rules[0].APIGroups)
+	assert.Equal(t, []string{"widgets"}, cr.Rules[0].Resources)
+}
+
+func TestDefaultRules_NoWildcards(t *testing.T) {
+	for _, rules := range [][]rbacv1.PolicyRule{defaultHealthCheckRules, defaultRemedyRules} {
+		for _, rule := range rules {
+			assert.NotContains(t, rule.APIGroups, "*", "default rules must not use wildcard apiGroups")
+			assert.NotContains(t, rule.Resources, "*", "default rules must not use wildcard resources")
+			for _, verb := range rule.Verbs {
+				assert.NotEqual(t, "*", verb, "default rules must not use wildcard verbs")
+			}
+		}
+	}
 }
 
 // --- ServiceAccount collision: same SA name for health and remedy ---
