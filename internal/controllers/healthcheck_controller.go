@@ -189,8 +189,10 @@ func (r *HealthCheckReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 func (r *HealthCheckReconciler) processOrRecoverHealthCheck(ctx context.Context, log logr.Logger, healthCheck *activemonitorv1alpha1.HealthCheck) (ctrl.Result, error) {
 	defer func() {
-		if err := recover(); err != nil {
-			log.Info("Error: Panic occurred during execAdd %s/%s due to %s", healthCheck.Name, healthCheck.Namespace, err)
+		if r := recover(); r != nil {
+			log.Error(fmt.Errorf("%v", r), "Panic occurred during healthcheck processing",
+				"name", healthCheck.Name,
+				"namespace", healthCheck.Namespace)
 		}
 	}()
 	// Process HealthCheck
