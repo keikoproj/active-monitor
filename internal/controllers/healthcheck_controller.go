@@ -210,8 +210,15 @@ func (r *HealthCheckReconciler) processOrRecoverHealthCheck(ctx context.Context,
 			return err
 		}
 		healthCheckNew.Status = healthCheck.Status
-		err := r.Update(ctx, &healthCheckNew)
-		return err
+		// Use the status subresource rather than a full-object Update.
+		// processHealthCheck / parseWorkflowFromHealthcheck mutate
+		// spec.RepeatAfterSec, spec.Workflow.Timeout and
+		// spec.RemedyWorkflow.Timeout as local computations; a full
+		// Update would persist those mutations back and silently change
+		// the user's desired spec (#319). Status().Update also only
+		// conflicts with other status writers, matching the RBAC split
+		// declared on the kubebuilder annotations above.
+		return r.Status().Update(ctx, &healthCheckNew)
 	})
 	if err != nil {
 		log.Error(err, "Error updating healthcheck resource")
