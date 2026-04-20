@@ -3,7 +3,7 @@ package store
 import (
 	"crypto/tls"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strconv"
 
@@ -48,7 +48,7 @@ func (reader *URLReader) Read() ([]byte, error) {
 		return nil, errors.New("status code " + strconv.Itoa(resp.StatusCode))
 	}
 
-	content, err := ioutil.ReadAll(resp.Body)
+	content, err := io.ReadAll(resp.Body)
 	if err != nil {
 		logrus.Warnf("failed to read url body for %s: %s", reader.urlArtifact.Path, err)
 		return nil, err
