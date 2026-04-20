@@ -501,13 +501,11 @@ func (r *HealthCheckReconciler) createSubmitWorkflowHelper(ctx context.Context, 
 
 func (r *HealthCheckReconciler) createSubmitWorkflow(ctx context.Context, log logr.Logger, hc *activemonitorv1alpha1.HealthCheck) (wfName string, err error) {
 	workflow := &unstructured.Unstructured{}
-	r.parseWorkflowFromHealthcheck(log, hc, workflow)
+	wfLabels, _ := r.parseWorkflowFromHealthcheck(log, hc, workflow)
 	workflow.SetGroupVersionKind(wfGvk)
 	workflow.SetNamespace(hc.Spec.Workflow.Resource.Namespace)
 	workflow.SetGenerateName(hc.Spec.Workflow.GenerateName)
-	r.TimerLock.RLock()
-	workflow.SetLabels(r.workflowLabels)
-	r.TimerLock.RUnlock()
+	workflow.SetLabels(wfLabels)
 	// set the owner references for workflow
 	ownerReferences := workflow.GetOwnerReferences()
 	trueVar := true
@@ -538,13 +536,11 @@ func (r *HealthCheckReconciler) createSubmitRemedyWorkflow(ctx context.Context, 
 		return "", errors.New("RemedyWorkflow Resource is nil")
 	}
 	remedyWorkflow := &unstructured.Unstructured{}
-	r.parseRemedyWorkflowFromHealthcheck(log, hc, remedyWorkflow)
+	rwfLabels, _ := r.parseRemedyWorkflowFromHealthcheck(log, hc, remedyWorkflow)
 	remedyWorkflow.SetGroupVersionKind(wfGvk)
 	remedyWorkflow.SetNamespace(hc.Spec.RemedyWorkflow.Resource.Namespace)
 	remedyWorkflow.SetGenerateName(hc.Spec.RemedyWorkflow.GenerateName)
-	r.TimerLock.RLock()
-	remedyWorkflow.SetLabels(r.workflowLabels)
-	r.TimerLock.RUnlock()
+	remedyWorkflow.SetLabels(rwfLabels)
 	// set the owner references for workflow
 	ownerReferences := remedyWorkflow.GetOwnerReferences()
 	trueVar := true
@@ -873,7 +869,7 @@ func (r *HealthCheckReconciler) watchRemedyWorkflow(ctx context.Context, req ctr
 	return nil
 }
 
-func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc *activemonitorv1alpha1.HealthCheck, uwf *unstructured.Unstructured) error {
+func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc *activemonitorv1alpha1.HealthCheck, uwf *unstructured.Unstructured) (map[string]string, error) {
 	var wfContent []byte
 	var data map[string]interface{}
 	if hc.Spec.Workflow.Resource != nil {
@@ -881,21 +877,27 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 		if err != nil {
 			log.Error(err, "Failed to get artifact reader")
 			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Failed to get artifact reader for workflow")
-			return err
+			return nil, err
 		}
 		wfContent, err = reader.Read()
 		if err != nil {
 			log.Error(err, "Failed to read content")
 			r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Failed to read content for workflow")
-			return err
+			return nil, err
 		}
 	}
 	// load workflow spec into data obj
 	if err := yaml.Unmarshal(wfContent, &data); err != nil {
 		log.Error(err, "Invalid spec file passed")
 		r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Invalid spec file passed")
-		return err
+		return nil, err
 	}
+
+	// Build a local label map for this reconcile. The previous version
+	// accumulated into r.workflowLabels on the reconciler struct, which
+	// leaked labels between concurrent HealthCheck reconciles under
+	// MAX_CONCURRENT_RECONCILES > 1 (#312).
+	workflowLabels := make(map[string]string)
 
 	// check if metadata is set then parse workflow labels
 	log.Info("workflow metadata is", "metadata:", data["metadata"])
@@ -907,25 +909,20 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 		if !tr {
 			log.Info("Workflow Labels are not set. ")
 		}
-		r.TimerLock.Lock()
-		if r.workflowLabels == nil {
-			r.workflowLabels = make(map[string]string)
-		}
 
 		// assign instanceId labels to workflows
 		if wflabels == nil {
-			r.workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
+			workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
 		} else if labelsMap, ok := wflabels.(map[string]interface{}); ok {
 			for k, v := range labelsMap {
 				strValue := fmt.Sprintf("%v", v)
-				r.workflowLabels[k] = strValue
+				workflowLabels[k] = strValue
 			}
 		} else {
 			log.Info("Workflow labels are not a map, using default instanceId label")
-			r.workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
+			workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
 		}
-		log.Info("Workflow Labels set are:", "wflabel:", r.workflowLabels)
-		r.TimerLock.Unlock()
+		log.Info("Workflow Labels set are:", "wflabel:", workflowLabels)
 	} else {
 		if data["metadata"] != nil && !metadataOk {
 			log.Info("metadata is not a map, treating as unset")
@@ -935,18 +932,13 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 			generateName string
 			labels       map[string]string
 		}
-		r.TimerLock.Lock()
-		if r.workflowLabels == nil {
-			r.workflowLabels = make(map[string]string)
-		}
 
 		// assign instanceId labels to workflows
-		r.workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
-		m1 := metadata{generateName: hc.Spec.Workflow.GenerateName, labels: r.workflowLabels}
+		workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
+		m1 := metadata{generateName: hc.Spec.Workflow.GenerateName, labels: workflowLabels}
 		data["metadata"] = m1
 		log.Info("metadata for Workflow is updated", "metadata generateName:", m1.generateName, "metadata label:", m1.labels)
-		log.Info("Workflow Labels are set:", "wflabel:", r.workflowLabels)
-		r.TimerLock.Unlock()
+		log.Info("Workflow Labels are set:", "wflabel:", workflowLabels)
 	}
 
 	content := uwf.UnstructuredContent()
@@ -964,14 +956,14 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 		err := errors.New("invalid workflow, missing spec")
 		log.Error(err, "Invalid workflow template spec")
 		r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Invalid workflow template spec")
-		return err
+		return nil, err
 	}
 	spec, specOk := specRaw.(map[string]interface{})
 	if !specOk {
 		err := errors.New("invalid workflow, spec is not a map")
 		log.Error(err, "Invalid workflow template spec type")
 		r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Invalid workflow template spec type")
-		return err
+		return nil, err
 	}
 	if spec["podGC"] == nil {
 		spec["podGC"] = &pgc
@@ -996,29 +988,33 @@ func (r *HealthCheckReconciler) parseWorkflowFromHealthcheck(log logr.Logger, hc
 	content["spec"] = spec
 	uwf.SetUnstructuredContent(content)
 	r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "workflow is parsed from healthcheck")
-	return nil
+	return workflowLabels, nil
 }
 
-func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logger, hc *activemonitorv1alpha1.HealthCheck, uwf *unstructured.Unstructured) error {
+func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logger, hc *activemonitorv1alpha1.HealthCheck, uwf *unstructured.Unstructured) (map[string]string, error) {
 	var wfContent []byte
 	var data map[string]interface{}
 	if hc.Spec.RemedyWorkflow.Resource != nil {
 		reader, err := store.GetArtifactReader(&hc.Spec.RemedyWorkflow.Resource.Source)
 		if err != nil {
 			log.Error(err, "Failed to get artifact reader")
-			return err
+			return nil, err
 		}
 		wfContent, err = reader.Read()
 		if err != nil {
 			log.Error(err, "Failed to read content")
-			return err
+			return nil, err
 		}
 	}
 	// load workflow spec into data obj
 	if err := yaml.Unmarshal(wfContent, &data); err != nil {
 		log.Error(err, "Invalid spec file passed")
-		return err
+		return nil, err
 	}
+
+	// Build a local label map for this reconcile - see
+	// parseWorkflowFromHealthcheck for the rationale (#312).
+	workflowLabels := make(map[string]string)
 
 	// check if metadata is set then parse workflow labels
 	log.Info("workflow metadata is", "metadata:", data["metadata"])
@@ -1030,25 +1026,20 @@ func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logg
 		if !tr {
 			log.Info("Workflow Labels are not set. ")
 		}
-		r.TimerLock.Lock()
-		if r.workflowLabels == nil {
-			r.workflowLabels = make(map[string]string)
-		}
 
 		// assign instanceId labels to workflows
 		if wflabels == nil {
-			r.workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
+			workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
 		} else if labelsMap, ok := wflabels.(map[string]interface{}); ok {
 			for k, v := range labelsMap {
 				strValue := fmt.Sprintf("%v", v)
-				r.workflowLabels[k] = strValue
+				workflowLabels[k] = strValue
 			}
 		} else {
 			log.Info("Workflow labels are not a map, using default instanceId label")
-			r.workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
+			workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
 		}
-		log.Info("Workflow Labels set are:", "wflabel:", r.workflowLabels)
-		r.TimerLock.Unlock()
+		log.Info("Workflow Labels set are:", "wflabel:", workflowLabels)
 	} else {
 		if data["metadata"] != nil && !metadataOk {
 			log.Info("metadata is not a map, treating as unset")
@@ -1058,18 +1049,13 @@ func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logg
 			generateName string
 			labels       map[string]string
 		}
-		r.TimerLock.Lock()
-		if r.workflowLabels == nil {
-			r.workflowLabels = make(map[string]string)
-		}
 
 		// assign instanceId labels to workflows
-		r.workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
-		m1 := metadata{generateName: hc.Spec.Workflow.GenerateName, labels: r.workflowLabels}
+		workflowLabels[WfInstanceIdLabelKey] = WfInstanceId
+		m1 := metadata{generateName: hc.Spec.Workflow.GenerateName, labels: workflowLabels}
 		data["metadata"] = m1
 		log.Info("metadata for Workflow is updated", "metadata generateName:", m1.generateName, "metadata label:", m1.labels)
-		log.Info("Workflow Labels are set:", "wflabel:", r.workflowLabels)
-		r.TimerLock.Unlock()
+		log.Info("Workflow Labels are set:", "wflabel:", workflowLabels)
 	}
 
 	content := uwf.UnstructuredContent()
@@ -1087,14 +1073,14 @@ func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logg
 		err := errors.New("Invalid remedy workflow, missing spec")
 		log.Error(err, "Invalid remedy workflow template spec")
 		r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Invalid remedy workflow template spec")
-		return err
+		return nil, err
 	}
 	spec, specOk := specRaw.(map[string]interface{})
 	if !specOk {
 		err := errors.New("invalid remedy workflow, spec is not a map")
 		log.Error(err, "Invalid remedy workflow template spec type")
 		r.Recorder.Event(hc, v1.EventTypeWarning, "Warning", "Invalid remedy workflow template spec type")
-		return err
+		return nil, err
 	}
 	if spec["podGC"] == nil {
 		spec["podGC"] = &pgc
@@ -1121,7 +1107,7 @@ func (r *HealthCheckReconciler) parseRemedyWorkflowFromHealthcheck(log logr.Logg
 	content["spec"] = spec
 	uwf.SetUnstructuredContent(content)
 	r.Recorder.Event(hc, v1.EventTypeNormal, "Normal", "Remedy workflow is parsed from healthcheck")
-	return nil
+	return workflowLabels, nil
 }
 
 // Create ServiceAccount
