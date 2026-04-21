@@ -109,7 +109,7 @@ func TestParseWorkflowFromHealthcheck_InvalidYAML_ReturnsError(t *testing.T) {
 	uwf := &unstructured.Unstructured{}
 	uwf.SetUnstructuredContent(map[string]interface{}{"spec": map[string]interface{}{}})
 
-	err := r.parseWorkflowFromHealthcheck(logr.Discard(), hc, uwf)
+	_, err := r.parseWorkflowFromHealthcheck(logr.Discard(), hc, uwf)
 	assert.Error(t, err)
 }
 
@@ -124,7 +124,7 @@ func TestParseWorkflowFromHealthcheck_UnknownArtifact_ReturnsError(t *testing.T)
 	}
 	uwf := &unstructured.Unstructured{}
 
-	err := r.parseWorkflowFromHealthcheck(logr.Discard(), hc, uwf)
+	_, err := r.parseWorkflowFromHealthcheck(logr.Discard(), hc, uwf)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown artifact location")
 }
@@ -142,7 +142,7 @@ func TestParseWorkflowFromHealthcheck_MissingSpec_ReturnsError(t *testing.T) {
 	uwf := &unstructured.Unstructured{}
 	uwf.SetUnstructuredContent(map[string]interface{}{})
 
-	err := r.parseWorkflowFromHealthcheck(logr.Discard(), hc, uwf)
+	_, err := r.parseWorkflowFromHealthcheck(logr.Discard(), hc, uwf)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "missing spec")
 }
@@ -163,7 +163,7 @@ func TestParseWorkflowFromHealthcheck_NonMapSpec_ReturnsError(t *testing.T) {
 	uwf := &unstructured.Unstructured{}
 	uwf.SetUnstructuredContent(map[string]interface{}{})
 
-	err := r.parseWorkflowFromHealthcheck(logr.Discard(), hc, uwf)
+	_, err := r.parseWorkflowFromHealthcheck(logr.Discard(), hc, uwf)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "spec is not a map")
 }
@@ -173,7 +173,7 @@ func TestParseWorkflowFromHealthcheck_NonMapMetadata_NoPanic(t *testing.T) {
 	// should not panic and should treat it as if metadata were unset.
 	r := newTestReconciler()
 	r.RepeatTimersByName = make(map[string]*time.Timer)
-	r.workflowLabels = nil
+	
 	hc := newHC("parse-nonmap-metadata", "default")
 	nonMapMeta := "apiVersion: argoproj.io/v1alpha1\nkind: Workflow\nmetadata: not-a-map\nspec:\n  entrypoint: hello\n  templates:\n  - name: hello\n    container:\n      image: alpine:3.6\n      command: [echo]\n      args: [\"hello\"]\n"
 	hc.Spec.Workflow.Resource = &activemonitorv1alpha1.ResourceObject{
@@ -185,10 +185,10 @@ func TestParseWorkflowFromHealthcheck_NonMapMetadata_NoPanic(t *testing.T) {
 	uwf.SetUnstructuredContent(map[string]interface{}{})
 
 	// Should not panic
-	err := r.parseWorkflowFromHealthcheck(logr.Discard(), hc, uwf)
+	labels, err := r.parseWorkflowFromHealthcheck(logr.Discard(), hc, uwf)
 	assert.NoError(t, err)
 	// Should have set the default instanceId label
-	assert.Equal(t, WfInstanceId, r.workflowLabels[WfInstanceIdLabelKey])
+	assert.Equal(t, WfInstanceId, labels[WfInstanceIdLabelKey])
 }
 
 func TestParseWorkflowFromHealthcheck_NonMapLabels_NoPanic(t *testing.T) {
@@ -196,7 +196,7 @@ func TestParseWorkflowFromHealthcheck_NonMapLabels_NoPanic(t *testing.T) {
 	// should not panic and should use the default instanceId label.
 	r := newTestReconciler()
 	r.RepeatTimersByName = make(map[string]*time.Timer)
-	r.workflowLabels = nil
+
 	hc := newHC("parse-nonmap-labels", "default")
 	nonMapLabels := "apiVersion: argoproj.io/v1alpha1\nkind: Workflow\nmetadata:\n  generateName: test-\n  labels: not-a-map\nspec:\n  entrypoint: hello\n  templates:\n  - name: hello\n    container:\n      image: alpine:3.6\n      command: [echo]\n      args: [\"hello\"]\n"
 	hc.Spec.Workflow.Resource = &activemonitorv1alpha1.ResourceObject{
@@ -207,10 +207,10 @@ func TestParseWorkflowFromHealthcheck_NonMapLabels_NoPanic(t *testing.T) {
 	uwf.SetUnstructuredContent(map[string]interface{}{})
 
 	// Should not panic
-	err := r.parseWorkflowFromHealthcheck(logr.Discard(), hc, uwf)
+	labels, err := r.parseWorkflowFromHealthcheck(logr.Discard(), hc, uwf)
 	assert.NoError(t, err)
 	// Should have set the default instanceId label
-	assert.Equal(t, WfInstanceId, r.workflowLabels[WfInstanceIdLabelKey])
+	assert.Equal(t, WfInstanceId, labels[WfInstanceIdLabelKey])
 }
 
 // --- Type assertion safety: parseRemedyWorkflowFromHealthcheck ---
@@ -227,7 +227,7 @@ func TestParseRemedyWorkflowFromHealthcheck_NonMapSpec_ReturnsError(t *testing.T
 	uwf := &unstructured.Unstructured{}
 	uwf.SetUnstructuredContent(map[string]interface{}{})
 
-	err := r.parseRemedyWorkflowFromHealthcheck(logr.Discard(), hc, uwf)
+	_, err := r.parseRemedyWorkflowFromHealthcheck(logr.Discard(), hc, uwf)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "spec is not a map")
 }
@@ -237,7 +237,7 @@ func TestParseRemedyWorkflowFromHealthcheck_NonFloatDeadline_UsesDefault(t *test
 	// and should fall back to the default timeout.
 	r := newTestReconciler()
 	r.RepeatTimersByName = make(map[string]*time.Timer)
-	r.workflowLabels = nil
+	
 	hc := newHC("parse-remedy-nonfloat-deadline", "default")
 	strDeadline := "apiVersion: argoproj.io/v1alpha1\nkind: Workflow\nmetadata:\n  generateName: test-\nspec:\n  entrypoint: hello\n  activeDeadlineSeconds: \"300\"\n  templates:\n  - name: hello\n    container:\n      image: alpine:3.6\n      command: [echo]\n      args: [\"hello\"]\n"
 	hc.Spec.RemedyWorkflow.Resource = &activemonitorv1alpha1.ResourceObject{
@@ -249,7 +249,7 @@ func TestParseRemedyWorkflowFromHealthcheck_NonFloatDeadline_UsesDefault(t *test
 	uwf := &unstructured.Unstructured{}
 	uwf.SetUnstructuredContent(map[string]interface{}{})
 
-	err := r.parseRemedyWorkflowFromHealthcheck(logr.Discard(), hc, uwf)
+	_, err := r.parseRemedyWorkflowFromHealthcheck(logr.Discard(), hc, uwf)
 	assert.NoError(t, err)
 	// Should fall back to RepeatAfterSec as the timeout
 	assert.Equal(t, 60, hc.Spec.RemedyWorkflow.Timeout)
@@ -589,7 +589,7 @@ func TestParseRemedyWorkflowFromHealthcheck_NilResource_NoPanicOnSA(t *testing.T
 	uwf.SetUnstructuredContent(map[string]interface{}{})
 
 	// Should succeed without panicking
-	err := r.parseRemedyWorkflowFromHealthcheck(logr.Discard(), hc, uwf)
+	_, err := r.parseRemedyWorkflowFromHealthcheck(logr.Discard(), hc, uwf)
 	assert.NoError(t, err)
 
 	// Now test with nil Resource — the function should not panic at the SA line.
@@ -603,7 +603,7 @@ func TestParseRemedyWorkflowFromHealthcheck_NilResource_NoPanicOnSA(t *testing.T
 	var panicVal interface{}
 	func() {
 		defer func() { panicVal = recover() }()
-		_ = r.parseRemedyWorkflowFromHealthcheck(logr.Discard(), hc, uwf2)
+		_, _ = r.parseRemedyWorkflowFromHealthcheck(logr.Discard(), hc, uwf2)
 	}()
 	// If it panics, it should be on nil map assignment, NOT on Resource.ServiceAccount
 	if panicVal != nil {
