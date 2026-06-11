@@ -8,17 +8,17 @@ require (
 	github.com/go-logr/logr v1.4.3
 	github.com/keikoproj/inverse-exp-backoff v0.1.2
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/onsi/ginkgo/v2 v2.28.3
-	github.com/onsi/gomega v1.40.0
+	github.com/onsi/ginkgo/v2 v2.29.0
+	github.com/onsi/gomega v1.41.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/sirupsen/logrus v1.9.3
+	github.com/sirupsen/logrus v1.9.4
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/net v0.53.0
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.33.11
-	k8s.io/apimachinery v0.33.11
-	k8s.io/client-go v0.33.11
+	k8s.io/api v0.33.12
+	k8s.io/apimachinery v0.33.12
+	k8s.io/client-go v0.33.12
 	sigs.k8s.io/controller-runtime v0.21.0
 )
 
