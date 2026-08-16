@@ -143,8 +143,11 @@ func main() {
 	flag.StringVar(&opts.probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.IntVar(&opts.maxParallel, "max-workers", 10, "The number of maximum parallel reconciles")
 
+	// Default to production mode so stack traces are not attached to every
+	// Warn/Error and DPanic does not crash the controller on edge cases.
+	// Users can still opt in via --zap-devel (registered by BindFlags).
 	zapOpts := zap.Options{
-		Development: true,
+		Development: false,
 	}
 	zapOpts.BindFlags(flag.CommandLine)
 	flag.Parse()
